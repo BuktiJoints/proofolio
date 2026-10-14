@@ -530,6 +530,20 @@ curl -fsS \
   "$API_BASE_URL/api/public/evidence/<token-dari-response>"
 ```
 
+## Rubrik demo keterampilan mengajar
+
+`bun run db:seed` juga menyiapkan **Keterampilan Mengajar (Microteaching)** sebagai rubric
+`PUBLISHED` pada default organization. Enam kriteria wajib: membuka pembelajaran (15), tujuan
+pembelajaran (10), penjelasan materi (25), interaksi peserta didik (20), komunikasi/penyajian (15),
+dan menutup pembelajaran (15), total 100 poin. Ini rubric latihan, bukan standar sertifikasi resmi.
+Seed bersifat transactional dan organization-scoped. Pengulangan tidak membuat versi/criterion
+baru atau menimpa revisi/arsip yang sudah dilakukan asesor; original version menjadi identitas seed.
+
+Untuk pengujian nyata, gunakan `FAKE_AI=false`, restart worker, lalu buat pengajuan baru dengan
+rubric microteaching. Rubric dan evidence submission lama tidak berubah ketika rubric baru dibuat.
+Jika video hanya cuplikan, bagian yang tidak terekam tidak boleh dianggap teramati. Lihat panduan
+[frontend development](./docs/frontend-development.md) untuk alur review dan pengujian.
+
 ## Development
 
 Panduan frontend, daftar halaman, dan langkah pengujian lengkap: [Frontend development](./docs/frontend-development.md).
@@ -562,7 +576,7 @@ bun run worker
 | `bun run worker` | Menjalankan analysis worker |
 | `bun run db:generate` | Menghasilkan migration Drizzle dari perubahan schema |
 | `bun run db:migrate` | Menjalankan migration |
-| `bun run db:seed` | Membuat organization, asesor, bucket, dan rubric demo |
+| `bun run db:seed` | Membuat organization, asesor, bucket, serta rubric demo K3 dan microteaching |
 | `bun run lint` | ESLint |
 | `bun run typecheck` | TypeScript tanpa emit |
 | `bun run test` | Vitest sekali jalan |

@@ -131,6 +131,18 @@ Production Compose membutuhkan environment production yang lengkap. Untuk pemeri
 saja, placeholder dapat dipakai pada invocation terpisah; jangan menjalankan stack production
 menggunakan placeholder.
 
+## Menguji video keterampilan mengajar
+
+Setelah `bun run db:seed`, refresh daftar rubrik siswa dan pilih **Keterampilan Mengajar
+(Microteaching)**. Rubrik ini sudah terbit, memiliki enam kriteria wajib dengan total 100 poin,
+dan dapat dipelajari pada halaman detail sebelum upload. Buat pengajuan baru; submission lama
+tetap memakai snapshot rubrik yang dipilih saat pengajuan tersebut dibuat.
+
+Untuk video mengajar dua menit, periksa bahwa opening, tujuan, penjelasan, interaksi, komunikasi,
+dan closing benar-benar terekam. Bukti bagian yang tidak terekam boleh `NOT_OBSERVED` atau
+`UNCERTAIN`; hasil demikian tidak berarti sistem gagal. AI tidak boleh mengarang aktivitas yang
+tidak ada. Asesor tetap memeriksa timestamp, menentukan skor dan memberi feedback.
+
 ## Menguji Gemini nyata
 
 Isi `GEMINI_API_KEY`, pilih `GEMINI_MODEL` yang tersedia untuk akun dan mendukung PDF serta video,
