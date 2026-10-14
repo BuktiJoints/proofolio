@@ -13,7 +13,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "bun scripts/seed.ts",
-    "worker": "bun server/worker/index.ts"
+    "worker": "bun server/worker/index.ts",
+    "test:e2e": "playwright test",
+    "test:api": "playwright test tests/e2e/api-contract.spec.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.901.0",
@@ -27,6 +29,7 @@
     "cn": "^0.4.0",
     "drizzle-orm": "^0.44.6",
     "file-type": "^21.0.0",
+    "geist": "^1.7.2",
     "lucide-react": "^1.57.0",
     "next": "16.4.0",
     "next-themes": "^0.4.6",
@@ -40,9 +43,10 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/turbopack": "^4",
-    "@types/busboy": "^1.5.4",
     "@tanstack/eslint-plugin-query": "^5.104.2",
+    "@types/busboy": "^1.5.4",
     "@types/node": "^20",
     "@types/pg": "^8.15.5",
     "@types/react": "^19",

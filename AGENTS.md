@@ -31,7 +31,7 @@ akan memengaruhi data, keamanan, atau pengalaman pengguna.
 Scope backend MVP:
 
 - Registrasi, login, session, dan profil siswa.
-- Pengelolaan rubrik berversi oleh asesor dan visibilitas rubrik aktif bagi siswa.
+- Pengelolaan rubrik berversi, calon draft dari PDF berbantuan Gemini, dan visibilitas rubrik aktif bagi siswa.
 - Upload video praktik ke private object storage.
 - Analisis video asynchronous dengan Gemini berdasarkan rubrik.
 - Verifikasi manusia, pemberian skor, feedback, dan finalisasi oleh asesor.
@@ -266,6 +266,22 @@ Dalam satu version, `code` dan `order` harus unik. `maxScore` adalah integer `1.
 - Body: `{ title, description?, criteria[] }`.
 - Success `201`: rubric `DRAFT` beserta version pertama.
 - Pembuatan rubric, version, dan criteria wajib berada dalam satu transaction.
+
+#### `POST /api/v1/rubrics/extract`
+
+- Role: `ASSESSOR`, authenticated melalui cookie Better Auth.
+- Content type: `multipart/form-data`; tepat satu field file `file`, berisi PDF maksimal 10 MiB.
+- Format diperiksa dari isi file, bukan filename atau MIME client.
+- PDF dikirim inline ke Gemini, tanpa penyimpanan object/file remote maupun row database.
+- Timeout ekstraksi 60 detik dengan abort provider; tidak ada retry otomatis yang menggandakan biaya.
+- Success `200`: `{ data: { draft: { title, description, criteria[] }, simulated, requiresHumanReview: true } }`.
+- Calon draft wajib ditinjau/diedit asesor. Simpan melalui `POST /api/v1/rubrics` atau edit draft;
+  publish tetap merupakan tindakan terpisah oleh asesor.
+- `FAKE_AI=true` mengembalikan contoh bertanda `simulated: true`, bukan ekstraksi isi dokumen.
+- Error: `400 MISSING_FIELDS / INVALID_RUBRIC_FILE`, `413 FILE_TOO_LARGE`,
+  `415 INVALID_CONTENT_TYPE / UNSUPPORTED_RUBRIC_FILE`, `503 RUBRIC_EXTRACTION_TIMEOUT /
+  RUBRIC_EXTRACTION_INVALID / RUBRIC_EXTRACTION_FAILED`. Provider error tidak diteruskan.
+- Output harus memenuhi schema rubric input, termasuk code/order unik dan maxScore integer 1..100.
 
 #### `GET /api/v1/rubrics/:id`
 
@@ -652,25 +668,17 @@ Bagian ini mendeskripsikan ketidaksesuaian kode saat dokumen dibuat. Ini bukan c
 dipertahankan. Hapus item hanya setelah implementation, migration bila perlu, OpenAPI, dan regression
 test selesai.
 
-1. `assertTransition` belum digunakan oleh route dan worker; status masih ditulis langsung.
-2. Edit draft rubric mengambil version tanpa ordering sehingga dapat mengubah version pertama,
-   bukan draft terbaru.
-3. Pembuatan rubric dan version pertama belum berada dalam satu transaction.
-4. Worker hanya mengambil `PENDING`/`RETRY_SCHEDULED`; abandoned `RUNNING` job tidak direclaim.
-5. Gemini file polling dan content generation belum mempunyai timeout.
-6. AI timestamp belum mewajibkan pasangan `startMs`/`endMs`; duplicate/unknown evidence belum
-   ditolak secara eksplisit.
-7. Invalid UUID dan submission status filter masih dapat menjadi generic `500`; pagination invalid
-   dapat menghasilkan metadata `null`.
-8. Submission detail belum menyaring draft review dan raw provider response untuk student.
-9. Concurrent retry dapat membuat duplicate job; concurrent review claim/finalize belum mempunyai
-   deterministic conflict handling.
-10. Scoring masih menggunakan denominator item yang dikirim client; policy criterion opsional belum
-    diterapkan dari rubric penuh.
-11. OpenAPI belum mencakup seluruh endpoint, schema, response, error, dan cookie security scheme.
-12. Default `GEMINI_MODEL` belum konsisten antara env schema, local Compose, production Compose,
-    dan `.env.example`.
-13. Repository belum memiliki GitHub Actions workflow yang menerbitkan image production ke GHCR.
-14. Audit event belum mencakup seluruh state change minimum.
-15. Test suite masih dominan unit test dan belum mencakup API, database, worker, concurrency,
-    security boundary, serta target NFR.
+1. Worker masih menulis status langsung, belum memakai domain transition service seperti route
+   review dan retry. Transisi retry otomatis worker belum konsisten dengan transition matrix.
+2. Worker hanya mengambil `PENDING`/`RETRY_SCHEDULED`; abandoned `RUNNING` job tidak direclaim.
+3. Gemini polling/generation untuk analisis video belum mempunyai timeout. Ekstraksi PDF memiliki
+   timeout dan abort terpisah.
+4. AI evidence video belum mewajibkan pasangan timestamp; duplicate/unknown evidence belum
+   dinormalisasi secara menyeluruh.
+5. Default `GEMINI_MODEL` belum konsisten antara env schema, local Compose, production Compose,
+   dan `.env.example`.
+6. Repository belum memiliki workflow GitHub Actions yang menerbitkan image production ke GHCR.
+7. Audit event worker belum mencakup seluruh state change minimum, termasuk `ANALYSIS_STARTED`.
+8. Unit tests serta API/browser integration dengan PostgreSQL dan concurrency tersedia. Coverage
+   worker permanent failure, crash recovery, duplicate workers, migration database kosong,
+   production startup ordering dan target NFR masih perlu dilengkapi.

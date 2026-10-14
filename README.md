@@ -264,8 +264,8 @@ diterima, bukan analisis sudah selesai.
 
 ## API Reference
 
-Dokumentasi machine-readable tersedia di `GET /api/openapi.json`, tetapi spesifikasinya saat ini
-belum mencakup seluruh schema dan endpoint. Kontrak normatif lengkap berada di
+Dokumentasi machine-readable endpoint produk, security cookie, schema, dan errors tersedia di
+`GET /api/openapi.json`. Kontrak normatif lengkap berada di
 [AGENTS.md](./AGENTS.md#4-api-contract).
 
 ### Authentication dan profile
@@ -294,6 +294,7 @@ Profile body:
 | Method | Endpoint | Role | Success | Keterangan |
 |---|---|---|---:|---|
 | `GET` | `/api/v1/rubrics` | Authenticated | `200` | Student hanya melihat published rubric |
+| `POST` | `/api/v1/rubrics/extract` | Assessor | `200` | PDF maksimal 10 MiB menjadi calon draft yang perlu diverifikasi |
 | `POST` | `/api/v1/rubrics` | Assessor | `201` | Membuat rubric dan version pertama |
 | `GET` | `/api/v1/rubrics/:id` | Authenticated | `200` | Detail versions dan criteria |
 | `PUT` | `/api/v1/rubrics/:id/draft` | Assessor | `200` | Mengubah draft version terbaru |
@@ -322,6 +323,15 @@ Create/edit rubric body:
 
 Dalam satu version, `code` dan `order` harus unik. Published version tidak boleh diubah; buat
 version baru untuk revisi.
+
+### Ekstraksi PDF rubrik
+
+Asesor dapat mengirim satu PDF melalui `POST /api/v1/rubrics/extract` menggunakan field multipart
+`file`. Response berisi `draft`, `requiresHumanReview: true`, dan `simulated`. File maksimal 10 MiB,
+timeout 60 detik. Dokumen dan hasil ekstraksi tidak disimpan otomatis. Setelah memeriksa judul,
+kriteria dan bobot, simpan draft dengan endpoint rubric biasa, lalu publish secara terpisah.
+Dengan `FAKE_AI=true`, output adalah contoh simulasi, bukan pembacaan isi PDF. Mode nyata memerlukan
+`GEMINI_API_KEY` dan model yang mendukung PDF/structured output. Jika gagal, isi rubrik manual.
 
 ### Submissions dan AI analysis
 
@@ -522,6 +532,9 @@ curl -fsS \
 
 ## Development
 
+Panduan frontend, daftar halaman, dan langkah pengujian lengkap: [Frontend development](./docs/frontend-development.md).
+
+
 ### Menjalankan tanpa Docker untuk aplikasi
 
 PostgreSQL dan MinIO tetap harus tersedia dan environment harus mengarah ke service tersebut.
@@ -554,6 +567,8 @@ bun run worker
 | `bun run typecheck` | TypeScript tanpa emit |
 | `bun run test` | Vitest sekali jalan |
 | `bun run test:watch` | Vitest watch mode |
+| `bun run test:api` | API integration dengan PostgreSQL lokal |
+| `bun run test:e2e` | API integration dan browser Chromium (web/worker/FAKE_AI diperlukan) |
 
 Verifikasi minimum sebelum commit:
 
@@ -691,19 +706,15 @@ adalah 100 MiB dan 120 detik; server memeriksa isi file dan menjalankan `ffprobe
 Backend memiliki happy path end-to-end yang telah diuji, tetapi belum seluruhnya production-ready.
 Temuan terpenting saat ini:
 
-1. State transition Rule Engine sudah didefinisikan, tetapi route dan worker masih melakukan sebagian
-   status update secara langsung.
-2. Edit draft rubric dapat mengubah version pertama, bukan draft version terbaru.
-3. Job `RUNNING` yang ditinggalkan worker crash belum direclaim secara otomatis.
-4. Gemini upload polling dan generation belum mempunyai timeout eksplisit.
-5. Invalid UUID/status filter masih dapat menjadi `500`; pagination invalid dapat menghasilkan
-   metadata yang tidak valid.
-6. Submission detail belum sepenuhnya menyaring draft review/raw provider response untuk siswa.
-7. Concurrent retry, review claim, dan finalization belum memiliki deterministic conflict handling.
-8. OpenAPI belum mendokumentasikan seluruh endpoint dan schema.
-9. Default Gemini model belum konsisten di semua konfigurasi; set `GEMINI_MODEL` eksplisit.
-10. Workflow publishing GHCR, API/database integration tests, concurrency tests, load test 10 RPS,
-    dan monitoring produk belum tersedia.
+1. Worker masih melakukan sebagian status update langsung; review dan retry route sudah memakai
+   transition service dan event transaction.
+2. Job `RUNNING` yang ditinggalkan worker crash belum direclaim secara otomatis.
+3. Gemini video upload polling/generation belum mempunyai timeout; ekstraksi PDF sudah dibatasi.
+4. Validasi/normalisasi AI evidence video masih perlu diperketat.
+5. Default Gemini model belum konsisten di semua konfigurasi; set `GEMINI_MODEL` eksplisit.
+6. Workflow publishing GHCR, worker failure/recovery tests, migration database kosong, load test
+   10 RPS dan monitoring produk belum tersedia. API/browser integration dan concurrency tests
+   untuk alur utama kini tersedia.
 
 Daftar lengkap dan target contract tersedia pada
 [Known Implementation Gaps di AGENTS.md](./AGENTS.md#9-known-implementation-gaps).
