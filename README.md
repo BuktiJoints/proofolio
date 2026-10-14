@@ -1,47 +1,709 @@
 # BuktiPraktik Backend
 
-Backend monolitik Next.js untuk pengumpulan video praktik, analisis bukti berbantuan Gemini, verifikasi asesor, dan portofolio publik siswa. AI tidak pernah menetapkan nilai akhir; hasil model selalu menunggu keputusan asesor.
+BuktiPraktik adalah backend monolitik Next.js untuk mengumpulkan video praktik siswa,
+mengidentifikasi bukti keterampilan dengan Gemini, memfasilitasi verifikasi asesor, dan
+menerbitkan portofolio keterampilan yang dapat dibagikan.
 
-## Menjalankan secara lokal
+AI hanya membantu menemukan bukti visual berdasarkan rubrik. Skor dan keputusan akhir selalu
+ditentukan manusia melalui proses review asesor.
 
-1. Salin `.env.example` menjadi `.env` dan isi `BETTER_AUTH_SECRET`. Isi `GEMINI_API_KEY` untuk analisis nyata, atau gunakan `FAKE_AI=true` untuk demo tanpa API eksternal.
-2. Jalankan `docker compose up --build`.
-3. API tersedia di `http://localhost:3000`; MinIO Console di `http://localhost:9001`. Compose memakai build komunitas MinIO `soldevelo/minio` karena image Community Edition upstream sudah ditarik dari registry publik pada 2026.
+> Kontrak engineering lengkap, keputusan arsitektur, dan aturan untuk coding agent tersedia di
+> [AGENTS.md](./AGENTS.md). README ini adalah panduan penggunaan praktis. Jika perilaku kode tidak
+> sesuai dengan kontrak target, lihat [Known limitations](#known-limitations).
 
-Compose menjalankan migrasi dan seed secara otomatis. Akun asesor bawaan mengikuti `SEED_ASSESSOR_EMAIL` dan `SEED_ASSESSOR_PASSWORD`. Siswa mendaftar melalui `POST /api/auth/sign-up/email` lalu melengkapi `PATCH /api/v1/me/profile`.
+## Daftar Isi
 
-## Alur demo
+- [Fitur utama](#fitur-utama)
+- [Arsitektur](#arsitektur)
+- [Quick start dengan Docker](#quick-start-dengan-docker)
+- [Konfigurasi environment](#konfigurasi-environment)
+- [API conventions](#api-conventions)
+- [API reference](#api-reference)
+- [Contoh alur API end-to-end](#contoh-alur-api-end-to-end)
+- [Development](#development)
+- [Deployment home server](#deployment-home-server)
+- [Security dan privasi](#security-dan-privasi)
+- [Troubleshooting](#troubleshooting)
+- [Known limitations](#known-limitations)
 
-1. Siswa masuk, mengambil rubrik terbit dari `GET /api/v1/rubrics`, lalu mengunggah `multipart/form-data` (`rubricVersionId`, `video`) ke `POST /api/v1/submissions`.
-2. Worker mengambil antrean PostgreSQL dengan `FOR UPDATE SKIP LOCKED`, mengirim video privat ke Gemini, lalu menyimpan bukti per kriteria.
-3. Asesor membuka hasil, memulai review, menyimpan nilai per kriteria, dan memfinalisasi.
-4. Siswa membuat tautan bukti dengan `POST /api/v1/submissions/:id/shares`; server hanya menyimpan hash token dan tautan dapat dicabut.
+## Fitur Utama
 
-Video dibatasi 100 MB dan 120 detik, dengan format MP4, WebM, atau MOV. Berkas disimpan privat di MinIO dan dialirkan melalui endpoint berotorisasi yang mendukung HTTP Range.
+### Siswa
 
-Dokumentasi mesin tersedia di `GET /api/openapi.json`. Health check: `/api/health/live` dan `/api/health/ready`.
+- Registrasi, login, dan pengelolaan profil sekolah/program keahlian.
+- Melihat rubrik kompetensi yang aktif.
+- Mengunggah video praktik dan melihat status proses penilaian.
+- Melihat skor serta feedback setelah review asesor selesai.
+- Melihat riwayat penilaian dan portofolio keterampilan.
+- Membuat dan mencabut tautan bukti publik yang memiliki masa berlaku.
 
-## Deployment home server
+### Asesor
 
-`compose.prod.yml` menarik image `ghcr.io/buktijoints/buktijoints:production`, sesuai tag production yang diterbitkan workflow GHCR dari branch `main`. Login ke GHCR terlebih dahulu jika package bersifat private, siapkan `.env` produksi, lalu jalankan:
+- Dashboard submission dalam organisasi yang sama.
+- Membuat, membuat versi baru, menerbitkan, dan mengarsipkan rubrik.
+- Memutar video privat dengan dukungan HTTP Range.
+- Melihat evidence dan timestamp hasil analisis AI.
+- Mengonfirmasi, menolak, atau menyesuaikan evidence per kriteria.
+- Menyimpan draft review, memberi skor/feedback, dan memfinalisasi penilaian.
 
-```bash
-docker compose -f compose.prod.yml pull
-docker compose -f compose.prod.yml up -d
+### Platform
+
+- PostgreSQL-backed job queue dengan bounded retry.
+- Gemini multimodal video analysis dengan structured JSON output.
+- Private S3-compatible storage menggunakan MinIO.
+- Versioned rubrics dan audit event untuk lifecycle submission.
+- Docker image yang sama untuk process `web`, `worker`, `migrate`, dan `seed`.
+
+## Arsitektur
+
+```mermaid
+flowchart LR
+    Client[Student / Assessor Client] -->|Cookie session + HTTP| API[Next.js API]
+    API --> Auth[Better Auth]
+    API --> DB[(PostgreSQL 17)]
+    API --> Storage[(Private MinIO / S3)]
+    DB -->|PENDING job| Worker[Analysis Worker]
+    Worker --> Storage
+    Worker -->|Temporary private upload| Gemini[Gemini API]
+    Gemini -->|Structured evidence| Worker
+    Worker --> DB
+    API -->|Final evidence link| Public[Public Portfolio Consumer]
 ```
 
-Variabel tanpa nilai default yang wajib diisi adalah `POSTGRES_PASSWORD`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `GEMINI_API_KEY`, `SEED_ASSESSOR_EMAIL`, dan `SEED_ASSESSOR_PASSWORD`. Gunakan password PostgreSQL yang URL-safe karena nilainya juga dipakai untuk membentuk `DATABASE_URL` internal. `APP_IMAGE` dan `IMAGE_TAG` dapat digunakan untuk memilih image atau tag SHA tertentu saat rollback.
+Alur utamanya:
 
-## Perintah pengembangan
+1. Siswa mengunggah video dan API segera mengembalikan submission `QUEUED`.
+2. Worker mengklaim job menggunakan PostgreSQL `FOR UPDATE SKIP LOCKED`.
+3. Worker mengirim video privat dan snapshot rubrik ke Gemini.
+4. Evidence tervalidasi disimpan per kriteria; submission menjadi `AWAITING_REVIEW`.
+5. Asesor memverifikasi evidence, memberi skor, dan memfinalisasi penilaian.
+6. Submission `COMPLETED` muncul di portofolio dan dapat dibuatkan tautan publik.
+
+### Komponen
+
+| Komponen | Tanggung jawab |
+|---|---|
+| Next.js App Router | HTTP API, auth adapter, authorization, dan response envelope |
+| Better Auth | Email/password authentication dan cookie session |
+| PostgreSQL 17 + Drizzle | System of record, queue, rubric, evidence, review, dan audit event |
+| MinIO/S3 | Penyimpanan video privat |
+| Worker | Claim job, pemanggilan Gemini, validasi output, retry, dan persistence |
+| Gemini | Ekstraksi evidence video; tidak menentukan nilai akhir |
+
+## Quick Start dengan Docker
+
+### Prerequisite
+
+- Docker Engine dan Docker Compose v2.
+- Port `3000`, `5432`, `9000`, dan `9001` tersedia di mesin lokal.
+- Gemini API key jika ingin menggunakan analisis nyata.
+
+### Menjalankan stack
+
+1. Buat konfigurasi lokal:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Ganti `BETTER_AUTH_SECRET` dengan random secret minimal 32 karakter. Isi
+   `GEMINI_API_KEY` dan set `FAKE_AI=false` untuk Gemini nyata, atau kosongkan key dan gunakan
+   `FAKE_AI=true` untuk pengujian tanpa provider eksternal.
+
+3. Jalankan seluruh service:
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+4. Periksa service:
+
+   ```bash
+   docker compose ps
+   curl -fsS http://localhost:3000/api/health/ready
+   ```
+
+API tersedia di `http://localhost:3000`. MinIO Console tersedia di
+`http://localhost:9001` dan hanya bind ke loopback pada Compose lokal.
+
+Compose menjalankan migration dan seed sebelum menyalakan web/worker. Akun asesor seed mengikuti
+`SEED_ASSESSOR_EMAIL` dan `SEED_ASSESSOR_PASSWORD`. Jangan menggunakan credential contoh pada
+deployment publik.
+
+### Menghentikan stack
 
 ```bash
-bun run db:generate
+docker compose down
+```
+
+Perintah tersebut mempertahankan volume PostgreSQL dan MinIO. `docker compose down -v` menghapus
+seluruh data lokal dan hanya boleh digunakan jika data memang tidak diperlukan.
+
+> Image MinIO memakai `soldevelo/minio:2026.7` karena image Community Edition upstream tidak lagi
+> tersedia dari registry publik yang sebelumnya digunakan.
+
+## Konfigurasi Environment
+
+Gunakan `.env.example` sebagai template. Jangan commit `.env` atau menampilkan nilainya dalam log.
+
+### Application dan authentication
+
+| Variable | Wajib | Keterangan |
+|---|---:|---|
+| `NODE_ENV` | Ya | `development`, `test`, atau `production` |
+| `BETTER_AUTH_URL` | Ya | URL origin aplikasi; production harus memakai URL publik HTTPS |
+| `BETTER_AUTH_SECRET` | Ya | Random secret minimal 32 karakter |
+| `DEFAULT_ORGANIZATION_SLUG` | Ya | Organisasi default untuk registrasi siswa |
+
+### PostgreSQL
+
+| Variable | Wajib | Keterangan |
+|---|---:|---|
+| `POSTGRES_DB` | Compose | Nama database |
+| `POSTGRES_USER` | Compose | User PostgreSQL |
+| `POSTGRES_PASSWORD` | Ya | Password; gunakan nilai URL-safe |
+| `DATABASE_URL` | Non-Compose | Connection string saat menjalankan aplikasi langsung |
+
+Compose membentuk `DATABASE_URL` internal menggunakan service hostname `db`. Nilai host
+`DATABASE_URL` pada `.env.example` digunakan untuk perintah Bun yang dijalankan di luar container.
+
+### Object storage
+
+| Variable | Wajib | Keterangan |
+|---|---:|---|
+| `S3_ENDPOINT` | Ya | Endpoint S3/MinIO; Compose menggunakan `http://minio:9000` |
+| `S3_REGION` | Ya | Default `us-east-1` |
+| `S3_ACCESS_KEY_ID` | Ya | Access key MinIO/S3 |
+| `S3_SECRET_ACCESS_KEY` | Ya | Secret key MinIO/S3 |
+| `S3_BUCKET` | Ya | Bucket video privat |
+| `S3_FORCE_PATH_STYLE` | Ya | `true` untuk MinIO |
+
+### Gemini dan worker
+
+| Variable | Wajib | Keterangan |
+|---|---:|---|
+| `GEMINI_API_KEY` | Jika real AI | API key Google Gemini |
+| `GEMINI_MODEL` | Ya | Set eksplisit; `gemini-3.7-flash` telah berhasil diuji |
+| `FAKE_AI` | Ya | `true` hanya untuk development/demo |
+| `WORKER_POLL_MS` | Ya | Interval polling queue |
+| `WORKER_MAX_ATTEMPTS` | Ya | Batas percobaan analysis job |
+
+Availability, quota, dan nama model dapat berubah di sisi provider. Jangan mengandalkan fallback
+model yang tidak diuji; selalu set `GEMINI_MODEL` secara eksplisit di production.
+
+### Upload, sharing, dan seed
+
+| Variable | Wajib | Keterangan |
+|---|---:|---|
+| `UPLOAD_MAX_BYTES` | Ya | Default `104857600` atau 100 MiB |
+| `UPLOAD_MAX_DURATION_SECONDS` | Ya | Default 120 detik |
+| `SHARE_TTL_HOURS` | Ya | Default masa berlaku share |
+| `SEED_ASSESSOR_NAME` | Ya | Nama akun asesor awal |
+| `SEED_ASSESSOR_EMAIL` | Ya | Email login asesor awal |
+| `SEED_ASSESSOR_PASSWORD` | Ya | Password kuat dan unik untuk asesor awal |
+| `LOG_LEVEL` | Tidak | Level logging aplikasi |
+
+## API Conventions
+
+### Authentication dan authorization
+
+- API menggunakan cookie session Better Auth, bukan bearer token buatan aplikasi.
+- `STUDENT` hanya dapat mengakses submission, video, portfolio, dan share miliknya.
+- `ASSESSOR` hanya dapat mengakses resource dalam organisasi yang sama.
+- Resource tenant/pengguna lain diperlakukan sebagai tidak ditemukan.
+
+### Response envelope
+
+Success:
+
+```json
+{
+  "data": {}
+}
+```
+
+Pagination:
+
+```json
+{
+  "data": [],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 0
+  }
+}
+```
+
+Error:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Data tidak valid",
+    "fields": {},
+    "requestId": "uuid"
+  }
+}
+```
+
+Status error utama: `400` validation, `401` unauthenticated, `403` role tidak diizinkan, `404`
+resource tidak terlihat, `409` state conflict, `413` upload limit, `415` media type, dan `503`
+dependency sementara tidak siap.
+
+### Submission status
+
+```text
+QUEUED -> ANALYZING -> AWAITING_REVIEW -> IN_REVIEW -> COMPLETED
+                 \-> ANALYSIS_FAILED -> QUEUED (manual retry)
+```
+
+AI analysis berjalan asynchronous. Respons upload `202` hanya berarti video dan job berhasil
+diterima, bukan analisis sudah selesai.
+
+## API Reference
+
+Dokumentasi machine-readable tersedia di `GET /api/openapi.json`, tetapi spesifikasinya saat ini
+belum mencakup seluruh schema dan endpoint. Kontrak normatif lengkap berada di
+[AGENTS.md](./AGENTS.md#4-api-contract).
+
+### Authentication dan profile
+
+| Method | Endpoint | Role | Success | Keterangan |
+|---|---|---|---:|---|
+| `POST` | `/api/auth/sign-up/email` | Public | `200` | Registrasi siswa |
+| `POST` | `/api/auth/sign-in/email` | Public | `200` | Login dan membuat cookie session |
+| `GET` | `/api/auth/get-session` | Public/session | `200` | Mengambil session aktif |
+| `GET` | `/api/v1/me` | Authenticated | `200` | User dan profile saat ini |
+| `PATCH` | `/api/v1/me/profile` | Student | `200` | Memperbarui nama, sekolah, dan program |
+| `GET` | `/api/v1/dashboard` | Authenticated | `200` | Count status dan lima submission terbaru |
+
+Profile body:
+
+```json
+{
+  "name": "Nama Siswa",
+  "schoolName": "SMK Contoh",
+  "programKeahlian": "Teknik Komputer"
+}
+```
+
+### Rubrics
+
+| Method | Endpoint | Role | Success | Keterangan |
+|---|---|---|---:|---|
+| `GET` | `/api/v1/rubrics` | Authenticated | `200` | Student hanya melihat published rubric |
+| `POST` | `/api/v1/rubrics` | Assessor | `201` | Membuat rubric dan version pertama |
+| `GET` | `/api/v1/rubrics/:id` | Authenticated | `200` | Detail versions dan criteria |
+| `PUT` | `/api/v1/rubrics/:id/draft` | Assessor | `200` | Mengubah draft version terbaru |
+| `POST` | `/api/v1/rubrics/:id/versions` | Assessor | `201` | Membuat version baru atau clone terbaru |
+| `POST` | `/api/v1/rubrics/:id/publish` | Assessor | `200` | Menerbitkan version terbaru |
+| `POST` | `/api/v1/rubrics/:id/archive` | Assessor | `200` | Mengarsipkan rubric |
+
+Create/edit rubric body:
+
+```json
+{
+  "title": "Praktik Keselamatan Kerja Dasar",
+  "description": "Rubrik praktik K3",
+  "criteria": [
+    {
+      "code": "APD",
+      "title": "Menggunakan APD",
+      "description": "Siswa menggunakan APD yang sesuai",
+      "order": 1,
+      "required": true,
+      "maxScore": 30
+    }
+  ]
+}
+```
+
+Dalam satu version, `code` dan `order` harus unik. Published version tidak boleh diubah; buat
+version baru untuk revisi.
+
+### Submissions dan AI analysis
+
+| Method | Endpoint | Role | Success | Keterangan |
+|---|---|---|---:|---|
+| `POST` | `/api/v1/submissions` | Student | `202` | Upload multipart dan enqueue analysis |
+| `GET` | `/api/v1/submissions` | Authenticated | `200` | List paginated; filter optional `status` |
+| `GET` | `/api/v1/submissions/:id` | Owner/Assessor | `200` | Detail rubric, evidence, dan review |
+| `GET` | `/api/v1/submissions/:id/video` | Owner/Assessor | `200/206` | Private video streaming dengan Range |
+| `POST` | `/api/v1/submissions/:id/retry-analysis` | Owner/Assessor | `200` | Retry hanya dari `ANALYSIS_FAILED` |
+
+Upload fields:
+
+| Field | Type | Keterangan |
+|---|---|---|
+| `rubricVersionId` | UUID string | Harus active version dari published rubric |
+| `video` | Binary file | MP4, WebM, atau MOV; maksimum 100 MiB dan 120 detik |
+
+AI evidence shape:
+
+```json
+{
+  "criterionId": "uuid",
+  "status": "OBSERVED",
+  "startMs": 1000,
+  "endMs": 2400,
+  "evidence": "Deskripsi faktual aktivitas yang terlihat",
+  "evidenceQuality": "CLEAR"
+}
+```
+
+Enum evidence:
+
+- `status`: `OBSERVED`, `NOT_OBSERVED`, `UNCERTAIN`.
+- `evidenceQuality`: `CLEAR`, `PARTIAL`, `OCCLUDED`.
+
+### Assessment review
+
+| Method | Endpoint | Role | Success | Keterangan |
+|---|---|---|---:|---|
+| `POST` | `/api/v1/submissions/:id/review/start` | Assessor | `201/200` | Claim review |
+| `PUT` | `/api/v1/submissions/:id/review` | Assigned assessor | `200` | Simpan draft review |
+| `POST` | `/api/v1/submissions/:id/review/finalize` | Assigned assessor | `200` | Finalisasi skor dan feedback |
+
+Review body:
+
+```json
+{
+  "feedback": "Prosedur sudah baik, perhatikan posisi APD.",
+  "items": [
+    {
+      "criterionId": "uuid-kriteria",
+      "decision": "CONFIRMED",
+      "score": 25,
+      "note": "APD terlihat digunakan sejak awal."
+    }
+  ]
+}
+```
+
+`decision` adalah `CONFIRMED`, `REJECTED`, atau `ADJUSTED`. Finalisasi membutuhkan feedback dan
+nilai untuk seluruh kriteria wajib. Skor harus berupa integer `0..maxScore`.
+
+### Portfolio dan public evidence
+
+| Method | Endpoint | Role | Success | Keterangan |
+|---|---|---|---:|---|
+| `GET` | `/api/v1/portfolio` | Student | `200` | Completed submissions dan metadata share |
+| `POST` | `/api/v1/submissions/:id/shares` | Owner student | `201` | Membuat expiring share token |
+| `DELETE` | `/api/v1/shares/:id` | Share owner | `200` | Mencabut share |
+| `GET` | `/api/public/evidence/:token` | Public | `200` | Final evidence yang dibagikan |
+| `GET` | `/api/public/evidence/:token/video` | Public token | `200/206` | Video melalui token aktif |
+
+Optional share body:
+
+```json
+{
+  "expiresInHours": 168
+}
+```
+
+Token mentah hanya dikembalikan ketika share dibuat. Database menyimpan hash token. Nilai `url`
+dalam response mengarah ke halaman frontend `/evidence/:token`; consumer backend dapat memakai
+`/api/public/evidence/:token` secara langsung.
+
+### Health dan specification
+
+| Method | Endpoint | Role | Keterangan |
+|---|---|---|---|
+| `GET` | `/api/health/live` | Public | Liveness process web |
+| `GET` | `/api/health/ready` | Public | Readiness PostgreSQL dan object storage |
+| `GET` | `/api/openapi.json` | Public | OpenAPI specification yang tersedia saat ini |
+
+## Contoh Alur API End-to-End
+
+Contoh berikut memakai placeholder dan menyimpan cookie sementara di `/tmp`. Jangan masukkan
+credential produksi ke shell history atau source code.
+
+```bash
+export API_BASE_URL=http://localhost:3000
+export STUDENT_COOKIE=/tmp/buktipraktik-student.cookies
+export ASSESSOR_COOKIE=/tmp/buktipraktik-assessor.cookies
+```
+
+### 1. Registrasi dan profile siswa
+
+```bash
+curl -fsS -c "$STUDENT_COOKIE" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Siswa Demo",
+    "email": "siswa@example.com",
+    "password": "replace-with-a-strong-password"
+  }' \
+  "$API_BASE_URL/api/auth/sign-up/email"
+
+curl -fsS -b "$STUDENT_COOKIE" -X PATCH \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Siswa Demo",
+    "schoolName": "SMK Demo",
+    "programKeahlian": "Teknik Komputer"
+  }' \
+  "$API_BASE_URL/api/v1/me/profile"
+```
+
+### 2. Pilih rubric dan upload video
+
+```bash
+curl -fsS -b "$STUDENT_COOKIE" \
+  "$API_BASE_URL/api/v1/rubrics"
+
+export RUBRIC_VERSION_ID='<activeVersionId-dari-response>'
+
+curl -fsS -b "$STUDENT_COOKIE" \
+  -F "rubricVersionId=$RUBRIC_VERSION_ID" \
+  -F 'video=@/path/to/video.mp4;type=video/mp4' \
+  "$API_BASE_URL/api/v1/submissions"
+```
+
+Simpan `data.id` dari response upload sebagai `SUBMISSION_ID`, lalu poll detail sampai status menjadi
+`AWAITING_REVIEW` atau `ANALYSIS_FAILED`:
+
+```bash
+export SUBMISSION_ID='<submission-id>'
+
+curl -fsS -b "$STUDENT_COOKIE" \
+  "$API_BASE_URL/api/v1/submissions/$SUBMISSION_ID"
+```
+
+### 3. Review asesor
+
+```bash
+curl -fsS -c "$ASSESSOR_COOKIE" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "<SEED_ASSESSOR_EMAIL>",
+    "password": "<SEED_ASSESSOR_PASSWORD>"
+  }' \
+  "$API_BASE_URL/api/auth/sign-in/email"
+
+curl -fsS -b "$ASSESSOR_COOKIE" -X POST \
+  "$API_BASE_URL/api/v1/submissions/$SUBMISSION_ID/review/start"
+
+curl -fsS -b "$ASSESSOR_COOKIE" -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "feedback": "Feedback final dari asesor.",
+    "items": [
+      {
+        "criterionId": "<criterion-id-dari-detail>",
+        "decision": "CONFIRMED",
+        "score": 25,
+        "note": "Evidence sesuai video."
+      }
+    ]
+  }' \
+  "$API_BASE_URL/api/v1/submissions/$SUBMISSION_ID/review/finalize"
+```
+
+Payload final harus memuat setiap kriteria wajib, bukan hanya satu item seperti contoh singkat di
+atas.
+
+### 4. Portfolio dan share
+
+```bash
+curl -fsS -b "$STUDENT_COOKIE" \
+  "$API_BASE_URL/api/v1/portfolio"
+
+curl -fsS -b "$STUDENT_COOKIE" -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{"expiresInHours":168}' \
+  "$API_BASE_URL/api/v1/submissions/$SUBMISSION_ID/shares"
+
+curl -fsS \
+  "$API_BASE_URL/api/public/evidence/<token-dari-response>"
+```
+
+## Development
+
+### Menjalankan tanpa Docker untuk aplikasi
+
+PostgreSQL dan MinIO tetap harus tersedia dan environment harus mengarah ke service tersebut.
+
+```bash
+bun install
 bun run db:migrate
 bun run db:seed
 bun run dev
+```
+
+Jalankan worker di terminal terpisah:
+
+```bash
 bun run worker
+```
+
+### Perintah proyek
+
+| Command | Fungsi |
+|---|---|
+| `bun run dev` | Next.js development server |
+| `bun run build` | Production build dengan webpack |
+| `bun run start` | Menjalankan production build |
+| `bun run worker` | Menjalankan analysis worker |
+| `bun run db:generate` | Menghasilkan migration Drizzle dari perubahan schema |
+| `bun run db:migrate` | Menjalankan migration |
+| `bun run db:seed` | Membuat organization, asesor, bucket, dan rubric demo |
+| `bun run lint` | ESLint |
+| `bun run typecheck` | TypeScript tanpa emit |
+| `bun run test` | Vitest sekali jalan |
+| `bun run test:watch` | Vitest watch mode |
+
+Verifikasi minimum sebelum commit:
+
+```bash
 bun run lint
 bun run typecheck
 bun run test
 bun run build
+docker compose config --quiet
 ```
+
+## Deployment Home Server
+
+`compose.prod.yml` menjalankan PostgreSQL 17, MinIO, migration, seed, web, dan worker. Compose ini
+menarik image berikut secara default:
+
+```text
+ghcr.io/buktijoints/buktijoints:production
+```
+
+### Status publishing image
+
+Repository saat ini belum memiliki `.github/workflows` untuk membangun dan menerbitkan image GHCR.
+Karena itu, tag `production` tidak boleh diasumsikan tersedia. Sebelum deployment, tambahkan
+workflow GHCR atau publish image secara manual:
+
+```bash
+docker build -t ghcr.io/buktijoints/buktijoints:<immutable-tag> .
+docker push ghcr.io/buktijoints/buktijoints:<immutable-tag>
+```
+
+Kemudian set `IMAGE_TAG=<immutable-tag>` di environment server. Gunakan SHA/immutable tag untuk
+rollback; jangan hanya bergantung pada mutable tag `production`.
+
+### Menjalankan production Compose
+
+1. Siapkan `.env` production. Variable yang wajib diisi tanpa default aman:
+   `POSTGRES_PASSWORD`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `S3_ACCESS_KEY_ID`,
+   `S3_SECRET_ACCESS_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `SEED_ASSESSOR_EMAIL`, dan
+   `SEED_ASSESSOR_PASSWORD`.
+2. Login ke GHCR jika package bersifat private:
+
+   ```bash
+   docker login ghcr.io
+   ```
+
+3. Pull dan jalankan:
+
+   ```bash
+   docker compose -f compose.prod.yml pull
+   docker compose -f compose.prod.yml up -d
+   docker compose -f compose.prod.yml ps
+   ```
+
+4. Verifikasi readiness dari host:
+
+   ```bash
+   curl -fsS http://127.0.0.1:3000/api/health/ready
+   ```
+
+Catatan production:
+
+- Letakkan TLS dan reverse proxy di edge/home-server layer.
+- Jangan expose PostgreSQL ke jaringan publik.
+- MinIO Console default bind ke `127.0.0.1`; pertahankan kecuali ada kontrol jaringan tambahan.
+- Backup volume PostgreSQL dan MinIO sebelum migration/deployment.
+- `BETTER_AUTH_URL` harus sama dengan origin HTTPS yang dipakai pengguna.
+- Pastikan password PostgreSQL URL-safe karena digunakan di internal `DATABASE_URL`.
+- `APP_IMAGE` dapat mengganti repository image dan `IMAGE_TAG` memilih versi tertentu.
+- Periksa log `migrate`, `seed`, `web`, dan `worker` jika startup gagal.
+
+## Security dan Privasi
+
+- Video disimpan dalam private bucket dan hanya dialirkan setelah authorization atau validasi share
+  token.
+- Public share token bersifat rahasia. Jangan memasukkannya ke application log, analytics property,
+  atau issue tracker.
+- Hanya hash token yang disimpan di database.
+- Jangan mengirim `.env`, API key Gemini, database dump, atau cookie session ke repository.
+- Gunakan credential MinIO, PostgreSQL, dan akun asesor yang berbeda dari contoh lokal.
+- AI output diperlakukan sebagai untrusted input dan harus ditinjau asesor.
+- Tautan publik menampilkan video dan hasil akhir; siswa harus memahami konsekuensi membagikannya.
+- Aplikasi belum menyediakan antivirus/malware scanning khusus untuk upload. Batasi akses dan ukuran
+  upload sesuai risiko deployment.
+
+## Troubleshooting
+
+### `PROFILE_INCOMPLETE`
+
+Lengkapi `name`, `schoolName`, dan `programKeahlian` melalui
+`PATCH /api/v1/me/profile` sebelum upload.
+
+### `RUBRIC_NOT_ACTIVE`
+
+Gunakan `activeVersionId` dari rubric yang berstatus `PUBLISHED`. Version historis atau draft tidak
+dapat dipakai untuk submission baru.
+
+### Submission tetap `QUEUED` atau `ANALYZING`
+
+```bash
+docker compose ps
+docker compose logs --tail=200 worker
+```
+
+Pastikan worker hidup, database/storage ready, Gemini key valid, model tersedia, dan quota belum
+habis. Karena analysis asynchronous, video tidak langsung selesai ketika upload mengembalikan
+`202`.
+
+### Gemini `404 model not found`
+
+Nama model dapat dihentikan untuk pengguna baru. Set `GEMINI_MODEL` ke model yang tersedia pada
+akun. `gemini-3.7-flash` telah berhasil diuji pada pengembangan ini, tetapi availability tetap dapat
+berubah.
+
+### Gemini `503 UNAVAILABLE` atau high demand
+
+Ini biasanya kegagalan sementara di provider. Worker melakukan bounded retry. Jika seluruh retry
+gagal, submission menjadi `ANALYSIS_FAILED` dan dapat dipicu ulang melalui endpoint retry.
+
+### Readiness `503`
+
+`/api/health/ready` memeriksa PostgreSQL dan bucket object storage. Periksa:
+
+```bash
+docker compose logs --tail=100 db minio migrate seed web
+```
+
+### Upload ditolak
+
+Pastikan file benar-benar video MP4, WebM, atau MOV, bukan hanya extension yang diganti. Batas default
+adalah 100 MiB dan 120 detik; server memeriksa isi file dan menjalankan `ffprobe`.
+
+## Known Limitations
+
+Backend memiliki happy path end-to-end yang telah diuji, tetapi belum seluruhnya production-ready.
+Temuan terpenting saat ini:
+
+1. State transition Rule Engine sudah didefinisikan, tetapi route dan worker masih melakukan sebagian
+   status update secara langsung.
+2. Edit draft rubric dapat mengubah version pertama, bukan draft version terbaru.
+3. Job `RUNNING` yang ditinggalkan worker crash belum direclaim secara otomatis.
+4. Gemini upload polling dan generation belum mempunyai timeout eksplisit.
+5. Invalid UUID/status filter masih dapat menjadi `500`; pagination invalid dapat menghasilkan
+   metadata yang tidak valid.
+6. Submission detail belum sepenuhnya menyaring draft review/raw provider response untuk siswa.
+7. Concurrent retry, review claim, dan finalization belum memiliki deterministic conflict handling.
+8. OpenAPI belum mendokumentasikan seluruh endpoint dan schema.
+9. Default Gemini model belum konsisten di semua konfigurasi; set `GEMINI_MODEL` eksplisit.
+10. Workflow publishing GHCR, API/database integration tests, concurrency tests, load test 10 RPS,
+    dan monitoring produk belum tersedia.
+
+Daftar lengkap dan target contract tersedia pada
+[Known Implementation Gaps di AGENTS.md](./AGENTS.md#9-known-implementation-gaps).
