@@ -1,0 +1,11 @@
+import { randomBytes } from "node:crypto";
+import { z } from "zod";
+import { currentUser } from "@/server/auth";
+import { db } from "@/server/db";
+import { evidenceShares } from "@/server/db/schema";
+import { accessibleSubmission } from "@/server/domain/submissions";
+import { hashToken } from "@/server/domain/shares";
+import { env } from "@/server/env";
+import { ApiError, ok, route } from "@/server/http";
+const input = z.object({ expiresInHours: z.number().int().min(1).max(24 * 30).optional() });
+export const POST = (request: Request, ctx: RouteContext<"/api/v1/submissions/[id]/shares">) => route(async () => { const user = await currentUser(["STUDENT"]); const { id } = await ctx.params; const submission = await accessibleSubmission(id, user); if (submission.status !== "COMPLETED") throw new ApiError(409, "SUBMISSION_NOT_COMPLETED", "Bukti hanya dapat dibagikan setelah penilaian selesai"); const raw = await request.text(); const body = raw ? input.parse(JSON.parse(raw)) : {}; const token = randomBytes(32).toString("base64url"); const expiresAt = new Date(Date.now() + (body.expiresInHours ?? env().SHARE_TTL_HOURS) * 3600000); const [share] = await db.insert(evidenceShares).values({ submissionId: id, tokenHash: hashToken(token), expiresAt, createdBy: user.id }).returning(); return ok({ id: share.id, token, url: `/evidence/${token}`, expiresAt }, { status: 201 }); });

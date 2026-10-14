@@ -1,0 +1,147 @@
+name: buktipraktik-prod
+
+x-app-image: &app-image ${APP_IMAGE:-ghcr.io/buktijoints/buktijoints}:${IMAGE_TAG:-production}
+x-app-environment: &app-environment
+  NODE_ENV: production
+  NEXT_TELEMETRY_DISABLED: "1"
+  DATABASE_URL: postgresql://${POSTGRES_USER:-bukti}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib diisi}@db:5432/${POSTGRES_DB:-bukti_praktik}
+  BETTER_AUTH_URL: ${BETTER_AUTH_URL:?BETTER_AUTH_URL wajib diisi dengan URL publik aplikasi}
+  BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET wajib diisi}
+  DEFAULT_ORGANIZATION_SLUG: ${DEFAULT_ORGANIZATION_SLUG:-smk-demo}
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?S3_ACCESS_KEY_ID wajib diisi}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?S3_SECRET_ACCESS_KEY wajib diisi}
+  S3_BUCKET: ${S3_BUCKET:-bukti-praktik}
+  S3_FORCE_PATH_STYLE: "true"
+  GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY wajib diisi}
+  GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+  FAKE_AI: "false"
+  UPLOAD_MAX_BYTES: ${UPLOAD_MAX_BYTES:-104857600}
+  UPLOAD_MAX_DURATION_SECONDS: ${UPLOAD_MAX_DURATION_SECONDS:-120}
+  WORKER_POLL_MS: ${WORKER_POLL_MS:-2000}
+  WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-3}
+  SHARE_TTL_HOURS: ${SHARE_TTL_HOURS:-168}
+  SEED_ASSESSOR_NAME: ${SEED_ASSESSOR_NAME:-Asesor Demo}
+  SEED_ASSESSOR_EMAIL: ${SEED_ASSESSOR_EMAIL:?SEED_ASSESSOR_EMAIL wajib diisi}
+  SEED_ASSESSOR_PASSWORD: ${SEED_ASSESSOR_PASSWORD:?SEED_ASSESSOR_PASSWORD wajib diisi}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+x-app-service: &app-service
+  image: *app-image
+  pull_policy: always
+  init: true
+  environment: *app-environment
+  networks:
+    - buktipraktik
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: buktipraktik-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bukti_praktik}
+      POSTGRES_USER: ${POSTGRES_USER:-bukti}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib diisi}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - buktipraktik
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bukti} -d ${POSTGRES_DB:-bukti_praktik}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  minio:
+    image: soldevelo/minio:2026.7
+    container_name: buktipraktik-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:?S3_ACCESS_KEY_ID wajib diisi}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?S3_SECRET_ACCESS_KEY wajib diisi}
+      MINIO_DEFAULT_BUCKETS: ${S3_BUCKET:-bukti-praktik}
+    volumes:
+      - minio_data:/bitnami/minio/data
+    ports:
+      - "${MINIO_CONSOLE_BIND:-127.0.0.1}:${MINIO_CONSOLE_PORT:-9001}:9001"
+    networks:
+      - buktipraktik
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  migrate:
+    <<: *app-service
+    container_name: buktipraktik-migrate
+    restart: "no"
+    command: ["bun", "run", "db:migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  seed:
+    <<: *app-service
+    container_name: buktipraktik-seed
+    restart: "no"
+    command: ["bun", "run", "db:seed"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+
+  web:
+    <<: *app-service
+    container_name: buktipraktik-web
+    restart: unless-stopped
+    ports:
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  worker:
+    <<: *app-service
+    container_name: buktipraktik-worker
+    restart: unless-stopped
+    command: ["bun", "run", "worker"]
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+networks:
+  buktipraktik:
+    name: buktipraktik-prod
+
+volumes:
+  postgres_data:
+    name: buktipraktik-postgres-prod
+  minio_data:
+    name: buktipraktik-minio-prod

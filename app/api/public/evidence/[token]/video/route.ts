@@ -1,0 +1,4 @@
+import { getVideo } from "@/server/integrations/storage";
+import { publicEvidence } from "@/server/domain/shares";
+import { route } from "@/server/http";
+export const GET = (request: Request, ctx: RouteContext<"/api/public/evidence/[token]/video">) => route(async () => { const { token } = await ctx.params; const row = await publicEvidence(token); const range = request.headers.get("range"); const object = await getVideo(row.submission.objectKey, range ?? undefined); if (!object.Body) return new Response(null, { status: 404 }); const headers = new Headers({ "Content-Type": row.submission.mimeType, "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=300" }); if (object.ContentLength !== undefined) headers.set("Content-Length", String(object.ContentLength)); if (object.ContentRange) headers.set("Content-Range", object.ContentRange); return new Response(object.Body.transformToWebStream() as ReadableStream, { status: range ? 206 : 200, headers }); });

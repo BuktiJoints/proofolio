@@ -1,0 +1,86 @@
+name: buktipraktik
+x-app-env: &app-env
+  NODE_ENV: production
+  DATABASE_URL: postgresql://${POSTGRES_USER:-bukti}:${POSTGRES_PASSWORD:-bukti_local_password}@db:5432/${POSTGRES_DB:-bukti_praktik}
+  BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+  BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-this-to-at-least-32-random-characters}
+  DEFAULT_ORGANIZATION_SLUG: ${DEFAULT_ORGANIZATION_SLUG:-smk-demo}
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-minioadmin}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-minioadmin123}
+  S3_BUCKET: ${S3_BUCKET:-bukti-praktik}
+  S3_FORCE_PATH_STYLE: "true"
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+  FAKE_AI: ${FAKE_AI:-false}
+  UPLOAD_MAX_BYTES: ${UPLOAD_MAX_BYTES:-104857600}
+  UPLOAD_MAX_DURATION_SECONDS: ${UPLOAD_MAX_DURATION_SECONDS:-120}
+  WORKER_POLL_MS: ${WORKER_POLL_MS:-2000}
+  WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-3}
+  SHARE_TTL_HOURS: ${SHARE_TTL_HOURS:-168}
+  SEED_ASSESSOR_NAME: ${SEED_ASSESSOR_NAME:-Asesor Demo}
+  SEED_ASSESSOR_EMAIL: ${SEED_ASSESSOR_EMAIL:-asesor@bukti.local}
+  SEED_ASSESSOR_PASSWORD: ${SEED_ASSESSOR_PASSWORD:-DemoAsesor123!}
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bukti_praktik}
+      POSTGRES_USER: ${POSTGRES_USER:-bukti}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bukti_local_password}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bukti} -d ${POSTGRES_DB:-bukti_praktik}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  minio:
+    image: soldevelo/minio:2026.7
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-minioadmin123}
+      MINIO_DEFAULT_BUCKETS: ${S3_BUCKET:-bukti-praktik}
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    volumes: ["minio_data:/bitnami/minio/data"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  migrate:
+    build: .
+    command: ["bun", "run", "db:migrate"]
+    environment: *app-env
+    depends_on:
+      db: { condition: service_healthy }
+  seed:
+    build: .
+    command: ["bun", "run", "db:seed"]
+    environment: *app-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      minio: { condition: service_healthy }
+  web:
+    build: .
+    environment: *app-env
+    ports: ["3000:3000"]
+    depends_on:
+      seed: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  worker:
+    build: .
+    command: ["bun", "run", "worker"]
+    environment: *app-env
+    depends_on:
+      seed: { condition: service_completed_successfully }
+
+volumes:
+  postgres_data:
+  minio_data:
