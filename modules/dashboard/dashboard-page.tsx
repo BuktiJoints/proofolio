@@ -10,7 +10,6 @@ import {
   ErrorState,
   LinkButton,
 } from "@/modules/shared/ui";
-import { statusLabels } from "@/modules/shared/presentation";
 import { SubmissionTable } from "@/modules/submissions/submission-table";
 import type {
   Envelope,
@@ -37,11 +36,25 @@ export function DashboardPage({ role }: { role: Role }) {
       <ErrorState error={query.error} retry={() => void query.refetch()} />
     );
   const base = role === "STUDENT" ? "/student" : "/assessor";
+  const counts = query.data.data.counts;
+  const metrics = role === "STUDENT"
+    ? [
+        ["Total video diunggah", Object.values(counts).reduce((total, count) => total + (count ?? 0), 0)],
+        ["Menunggu penilaian", (counts.QUEUED ?? 0) + (counts.ANALYZING ?? 0) + (counts.AWAITING_REVIEW ?? 0) + (counts.IN_REVIEW ?? 0)],
+        ["Terverifikasi", counts.COMPLETED ?? 0],
+      ] as const
+    : [
+        ["Menunggu review", counts.AWAITING_REVIEW ?? 0],
+        ["Sedang direview", counts.IN_REVIEW ?? 0],
+        ["Selesai", counts.COMPLETED ?? 0],
+      ] as const;
   return (
     <>
       <PageHeading
-        title={role === "STUDENT" ? "Dashboard siswa" : "Dashboard asesor"}
-        description="Pantau perkembangan pengajuan dan hasil penilaian praktik."
+        title={role === "STUDENT" && me.data ? `Halo, ${me.data.user.name}` : "Dashboard asesor"}
+        description={role === "STUDENT" && me.data?.profile
+          ? `${me.data.profile.nisn ?? "NISN belum diisi"} · ${me.data.profile.programKeahlian ?? "Jurusan belum diisi"} · ${me.data.profile.schoolName ?? "Sekolah belum diisi"}`
+          : "Pantau perkembangan pengajuan dan hasil penilaian praktik."}
         action={
           <LinkButton
             href={
@@ -65,13 +78,13 @@ export function DashboardPage({ role }: { role: Role }) {
         </Alert>
       )}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {Object.entries(statusLabels).map(([status, label]) => (
-          <Card key={status}>
+        {metrics.map(([label, count]) => (
+          <Card key={label}>
             <CardHeader>
               <CardTitle className="text-sm font-medium">{label}</CardTitle>
             </CardHeader>
             <CardContent className="text-3xl font-semibold">
-              {query.data.data.counts[status as SubmissionStatus] ?? 0}
+              {count}
             </CardContent>
           </Card>
         ))}
@@ -82,7 +95,15 @@ export function DashboardPage({ role }: { role: Role }) {
           Lihat semua
         </LinkButton>
       </div>
-      <SubmissionTable submissions={query.data.data.recent} base={base} />
+      <SubmissionTable submissions={query.data.data.recent.slice(0, 3)} base={base} />
+      {role === "STUDENT" && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Portofolio kompetensi</CardTitle></CardHeader>
+          <CardContent>
+            <LinkButton href="/student/portfolio" variant="outline">Lihat dan bagikan portofolio</LinkButton>
+          </CardContent>
+        </Card>
+      )}
     </>
   );
 }

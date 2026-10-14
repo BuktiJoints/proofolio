@@ -62,6 +62,10 @@ const rubricSchema: Schema = {
     description: { type: ["string", "null"] },
     status: { enum: ["DRAFT", "PUBLISHED", "ARCHIVED"] },
     activeVersionId: { type: ["string", "null"], format: "uuid" },
+    partner: {
+      type: "object",
+      properties: { id: uuid, name: str },
+    },
     versions: array(ref("RubricVersion")),
   },
 };
@@ -69,7 +73,7 @@ export const openapi = {
   openapi: "3.1.0",
   info: {
     title: "BuktiPraktik API",
-    version: "1.1.0",
+    version: "1.2.0",
     description:
       "AI menghasilkan calon bukti dan draft rubrik. Penilaian akhir dan penerbitan rubrik tetap dilakukan asesor.",
   },
@@ -109,13 +113,17 @@ export const openapi = {
           email: { type: "string", format: "email" },
           role: { enum: ["STUDENT", "ASSESSOR"] },
           organizationId: uuid,
+          image: { type: ["string", "null"], format: "uri" },
         },
       },
       Profile: {
         type: ["object", "null"],
         properties: {
+          nisn: { type: ["string", "null"], pattern: "^[0-9]{10}$" },
+          phone: { type: ["string", "null"] },
           schoolName: { type: ["string", "null"] },
           programKeahlian: { type: ["string", "null"] },
+          notificationStatusEnabled: { type: "boolean" },
         },
       },
       CriterionInput: {
@@ -180,6 +188,7 @@ export const openapi = {
           id: uuid,
           status: { enum: statusEnum },
           rubricVersionId: uuid,
+          rubricTitle: str,
           originalFilename: str,
           durationMs: { type: "integer" },
           normalizedScore: { type: ["string", "null"] },
@@ -365,6 +374,23 @@ export const openapi = {
         { security: [] },
       ),
     },
+    "/api/auth/change-password": {
+      post: operation(
+        "Ubah password dan opsional cabut session lain melalui Better Auth",
+        { type: "object" },
+        {
+          requestBody: body({
+            type: "object",
+            required: ["currentPassword", "newPassword"],
+            properties: {
+              currentPassword: str,
+              newPassword: { type: "string", minLength: 8 },
+              revokeOtherSessions: { type: "boolean" },
+            },
+          }),
+        },
+      ),
+    },
     "/api/v1/me": {
       get: operation(
         "Pengguna dan profil",
@@ -379,7 +405,13 @@ export const openapi = {
         "Simpan profil siswa secara atomic",
         envelope({
           type: "object",
-          properties: { name: str, schoolName: str, programKeahlian: str },
+          properties: {
+            nisn: { type: ["string", "null"] },
+            phone: { type: ["string", "null"] },
+            schoolName: { type: ["string", "null"] },
+            programKeahlian: { type: ["string", "null"] },
+            notificationStatusEnabled: { type: "boolean" },
+          },
         }),
         {
           requestBody: body({
@@ -389,6 +421,10 @@ export const openapi = {
               name: { type: "string", minLength: 2, maxLength: 120 },
               schoolName: { type: "string", minLength: 2, maxLength: 180 },
               programKeahlian: { type: "string", minLength: 2, maxLength: 180 },
+              nisn: { type: ["string", "null"], pattern: "^[0-9]{10}$" },
+              phone: { type: ["string", "null"] },
+              image: { type: ["string", "null"], format: "uri" },
+              notificationStatusEnabled: { type: "boolean" },
             },
           }),
         },

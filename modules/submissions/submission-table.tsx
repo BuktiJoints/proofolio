@@ -42,7 +42,7 @@ export function SubmissionTable({
           {submissions.map((submission) => (
             <TableRow key={submission.id}>
               <TableCell className="max-w-60 truncate font-medium">
-                {submission.originalFilename}
+                {submission.rubricTitle || submission.originalFilename}
               </TableCell>
               <TableCell>
                 <StatusBadge status={submission.status} />

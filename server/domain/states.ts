@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { submissions, submissionEvents } from "@/server/db/schema";
 import type { db } from "@/server/db";
+import type { PoolClient } from "pg";
 import { ApiError } from "@/server/http";
 
 const transitions: Record<string, string[]> = {
@@ -39,4 +40,24 @@ export async function transitionSubmission(
   await tx
     .insert(submissionEvents)
     .values({ submissionId: submission.id, ...event });
+}
+
+// Worker claims use PostgreSQL SKIP LOCKED through a native client. Keeping the
+// transition and its audit event here prevents the queue adapter from bypassing
+// the same state machine used by HTTP routes.
+export async function transitionSubmissionWithClient(
+  client: PoolClient,
+  submission: { id: string; status: typeof submissions.$inferSelect.status },
+  to: typeof submissions.$inferSelect.status,
+  event: { type: string; payload?: Record<string, unknown> },
+) {
+  assertTransition(submission.status, to);
+  await client.query(
+    "update submissions set status=$2, updated_at=now() where id=$1",
+    [submission.id, to],
+  );
+  await client.query(
+    "insert into submission_events (submission_id, type, payload) values ($1, $2, $3::jsonb)",
+    [submission.id, event.type, JSON.stringify(event.payload ?? {})],
+  );
 }

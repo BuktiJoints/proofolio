@@ -13,6 +13,9 @@ export function useMe() {
 export const homeForRole = (role: Role) =>
   role === "ASSESSOR" ? "/assessor/dashboard" : "/student/dashboard";
 export const profileComplete = (me: Me) =>
-  !!me.profile?.schoolName && !!me.profile?.programKeahlian;
+  !!me.profile?.schoolName &&
+  !!me.profile?.programKeahlian &&
+  !!me.profile?.nisn &&
+  !!me.profile?.phone;
 export const unauthenticated = (error: unknown) =>
   error instanceof ClientApiError && error.status === 401;

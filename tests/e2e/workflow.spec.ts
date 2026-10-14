@@ -80,6 +80,12 @@ test("student registration → PDF rubric → video → assessor review → port
       .getByRole("link", { name: "Lengkapi profil", exact: true })
       .click();
     await studentPage
+      .getByLabel("NISN", { exact: true })
+      .fill("1234567891");
+    await studentPage
+      .getByLabel("Nomor telepon", { exact: true })
+      .fill("081234567891");
+    await studentPage
       .getByLabel("Nama sekolah", { exact: true })
       .fill("SMK Pengujian");
     await studentPage

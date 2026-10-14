@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { currentUser } from "@/server/auth";
 import { db } from "@/server/db";
-import { rubrics, rubricVersions, rubricCriteria } from "@/server/db/schema";
+import { organizations, rubrics, rubricVersions, rubricCriteria } from "@/server/db/schema";
 import { rubricInput } from "@/server/domain/rubrics";
 import { ok, route } from "@/server/http";
 
@@ -17,8 +17,20 @@ export const GET = () =>
         : eq(rubrics.organizationId, user.organizationId);
     return ok(
       await db
-        .select()
+        .select({
+          id: rubrics.id,
+          organizationId: rubrics.organizationId,
+          title: rubrics.title,
+          description: rubrics.description,
+          status: rubrics.status,
+          activeVersionId: rubrics.activeVersionId,
+          createdBy: rubrics.createdBy,
+          createdAt: rubrics.createdAt,
+          updatedAt: rubrics.updatedAt,
+          partner: { id: organizations.id, name: organizations.name },
+        })
         .from(rubrics)
+        .innerJoin(organizations, eq(organizations.id, rubrics.organizationId))
         .where(condition)
         .orderBy(desc(rubrics.updatedAt)),
     );
