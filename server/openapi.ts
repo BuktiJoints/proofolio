@@ -544,7 +544,7 @@ export const openapi = {
                       type: "string",
                       format: "binary",
                       description:
-                        "MP4/WebM/MOV; default 100 MiB dan 120 detik",
+                        "MP4/WebM/MOV; default 100 MiB dan maksimal 120000 ms inklusif. VIDEO_TOO_LONG mengembalikan fields.durationMs dan fields.maxDurationMs",
                     },
                   },
                 },

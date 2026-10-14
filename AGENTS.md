@@ -341,7 +341,8 @@ Error utama:
 - `400 MISSING_FIELDS`
 - `400 INVALID_VIDEO`
 - `413 FILE_TOO_LARGE`
-- `413 VIDEO_TOO_LONG`
+- `413 VIDEO_TOO_LONG`: pesan memuat durasi yang dibaca `ffprobe`; `fields` berisi
+  `durationMs` dan `maxDurationMs`. Batas 120 detik bersifat inklusif (120000 ms legal).
 - `415 INVALID_CONTENT_TYPE`
 - `415 UNSUPPORTED_VIDEO`
 
