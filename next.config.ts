@@ -8,14 +8,6 @@ const nextConfig: NextConfig = {
     // The CLI checker can return empty stdout under Nix's detached process wrapper.
     useTypeScriptCli: false,
   },
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
-  },
 };
 
 export default nextConfig;

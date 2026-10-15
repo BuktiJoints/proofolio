@@ -46,7 +46,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
-    "@tailwindcss/turbopack": "^4",
+    "@tailwindcss/postcss": "^4.3.3",
     "@tanstack/eslint-plugin-query": "^5.104.2",
     "@types/busboy": "^1.5.4",
     "@types/node": "^20",
