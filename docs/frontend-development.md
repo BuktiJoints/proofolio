@@ -1,6 +1,6 @@
 # Development frontend BuktiPraktik
 
-Frontend memakai Next.js App Router, shadcn Base UI (tema neutral), Geist lokal, Lucide,
+Frontend memakai Next.js App Router, shadcn Base UI (token SkillFolio), Sora/Poppins lokal, Lucide,
 dan TanStack Query. Seluruh implementasi fitur berada dalam `modules/`; `app/` menghubungkan
 URL dan layout ke modul. Komponen shadcn bersama berada di `components/ui/`.
 
@@ -13,6 +13,7 @@ Terminal 1:
 
 ```bash
 docker compose up -d --wait db minio
+bun run db:migrate
 bun run dev
 ```
 
@@ -28,7 +29,8 @@ Terminal 3 untuk pemeriksaan:
 curl -fsS http://localhost:3000/api/health/ready
 ```
 
-Database sudah dimigrasikan dalam setup awal; perubahan ini tidak menambahkan schema atau migration.
+Jalankan migration setelah menarik perubahan kode yang membawa migration baru.
+Menjalankan ulang `db:migrate` aman karena migration yang sudah diterapkan dilewati.
 Pada mesin baru, jalankan `bun install`, `bun run db:migrate` dan `bun run db:seed` sebelum aplikasi.
 Upload video membutuhkan `ffprobe` (tersedia setelah `brew install ffmpeg` di macOS).
 
@@ -152,3 +154,16 @@ mode simulasi agar tidak menggunakan kuota provider.
 
 Gap backend yang belum termasuk pekerjaan frontend ini, seperti worker crash recovery dan timeout
 analisis video, tercantum dalam AGENTS.md. Baca daftar tersebut sebelum deployment publik.
+
+## Error 500 pada `/api/v1/me` setelah update kode
+
+Jika schema aplikasi membaca `nisn`, `phone`, atau `notification_status_enabled`
+tetapi database masih versi lama, endpoint profil dapat mengembalikan 500.
+Pastikan database lokal aktif, lalu jalankan `bun run db:migrate`. Jangan
+mereset volume/database: migration menambahkan field dan mempertahankan data.
+
+Verifikasi regresi (akun pengujian sementara dibersihkan otomatis):
+
+```bash
+bunx playwright test tests/e2e/profile-schema.spec.ts
+```
