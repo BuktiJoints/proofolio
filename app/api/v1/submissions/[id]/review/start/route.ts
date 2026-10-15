@@ -1,7 +1,64 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { currentUser } from "@/server/auth";
 import { db } from "@/server/db";
-import { assessmentReviews, submissionEvents, submissions } from "@/server/db/schema";
-import { accessibleSubmission } from "@/server/domain/submissions";
-import { ApiError, ok, route } from "@/server/http";
-export const POST = (_: Request, ctx: RouteContext<"/api/v1/submissions/[id]/review/start">) => route(async () => { const user = await currentUser(["ASSESSOR"]); const { id } = await ctx.params; const submission = await accessibleSubmission(id, user); const [existing] = await db.select().from(assessmentReviews).where(eq(assessmentReviews.submissionId, id)).limit(1); if (existing) { if (existing.assessorId !== user.id) throw new ApiError(409, "REVIEW_ALREADY_CLAIMED", "Pengumpulan sedang dinilai asesor lain"); return ok(existing); } if (submission.status !== "AWAITING_REVIEW") throw new ApiError(409, "REVIEW_NOT_READY", "Analisis AI belum siap untuk direview"); const review = await db.transaction(async (tx) => { const [created] = await tx.insert(assessmentReviews).values({ submissionId: id, assessorId: user.id }).returning(); await tx.update(submissions).set({ status: "IN_REVIEW", updatedAt: new Date() }).where(eq(submissions.id, id)); await tx.insert(submissionEvents).values({ submissionId: id, actorId: user.id, type: "REVIEW_STARTED" }); return created; }); return ok(review, { status: 201 }); });
+import { assessmentReviews, submissions } from "@/server/db/schema";
+import { transitionSubmission } from "@/server/domain/states";
+import { uuidParam, ApiError, ok, route } from "@/server/http";
+export const POST = (
+  _: Request,
+  ctx: RouteContext<"/api/v1/submissions/[id]/review/start">,
+) =>
+  route(async () => {
+    const user = await currentUser(["ASSESSOR"]);
+    const { id } = await ctx.params;
+    uuidParam(id);
+    const result = await db.transaction(async (tx) => {
+      const [submission] = await tx
+        .select()
+        .from(submissions)
+        .where(
+          and(
+            eq(submissions.id, id),
+            eq(submissions.organizationId, user.organizationId),
+          ),
+        )
+        .limit(1)
+        .for("update");
+      if (!submission)
+        throw new ApiError(
+          404,
+          "SUBMISSION_NOT_FOUND",
+          "Pengumpulan tidak ditemukan",
+        );
+      const [existing] = await tx
+        .select()
+        .from(assessmentReviews)
+        .where(eq(assessmentReviews.submissionId, id))
+        .limit(1);
+      if (existing) {
+        if (existing.assessorId !== user.id)
+          throw new ApiError(
+            409,
+            "REVIEW_ALREADY_CLAIMED",
+            "Pengumpulan sedang dinilai asesor lain",
+          );
+        return { review: existing, status: 200 };
+      }
+      if (submission.status !== "AWAITING_REVIEW")
+        throw new ApiError(
+          409,
+          "REVIEW_NOT_READY",
+          "Analisis AI belum siap untuk direview",
+        );
+      const [review] = await tx
+        .insert(assessmentReviews)
+        .values({ submissionId: id, assessorId: user.id })
+        .returning();
+      await transitionSubmission(tx, submission, "IN_REVIEW", {
+        actorId: user.id,
+        type: "REVIEW_STARTED",
+      });
+      return { review, status: 201 };
+    });
+    return ok(result.review, { status: result.status });
+  });

@@ -1,0 +1,3 @@
+// Shared by shadcn text inputs, textareas, and select triggers.
+export const controlStyles =
+  "w-full min-w-0 rounded-(--control-radius) border border-transparent bg-card px-4 py-3 text-b8 text-foreground shadow-control transition-[color,border-color,box-shadow] outline-none placeholder:text-neutral-60 hover:shadow-control-hover focus-visible:border-primary-70 focus-visible:text-primary-70 focus-visible:shadow-control-focus disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-30 disabled:text-neutral-50 disabled:shadow-none disabled:placeholder:text-neutral-50 aria-invalid:border-red-70 aria-invalid:ring-3 aria-invalid:ring-red-60/20 md:px-5 md:text-b7";

@@ -1,33 +1,181 @@
+import { z } from "zod";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { currentUser } from "@/server/auth";
 import { db } from "@/server/db";
-import { analysisJobs, rubrics, rubricVersions, studentProfiles, submissionEvents, submissions } from "@/server/db/schema";
+import {
+  analysisJobs,
+  rubrics,
+  rubricVersions,
+  studentProfiles,
+  submissionEvents,
+  submissions,
+  users,
+} from "@/server/db/schema";
 import { deleteVideo, putVideo } from "@/server/integrations/storage";
 import { ApiError, ok, pageParams, paged, route } from "@/server/http";
 import { cleanupUpload, parseVideoUpload } from "@/server/uploads";
 
-export const POST = (request: Request) => route(async () => {
-  const user = await currentUser(["STUDENT"]);
-  const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.userId, user.id)).limit(1);
-  if (!profile?.schoolName || !profile.programKeahlian) throw new ApiError(409, "PROFILE_INCOMPLETE", "Lengkapi profil sebelum mengunggah video");
-  const upload = await parseVideoUpload(request); const objectKey = `${user.organizationId}/${user.id}/${crypto.randomUUID()}`; let uploaded = false;
-  try {
-    const [version] = await db.select({ id: rubricVersions.id }).from(rubricVersions).innerJoin(rubrics, eq(rubrics.id, rubricVersions.rubricId)).where(and(eq(rubricVersions.id, upload.rubricVersionId), eq(rubrics.organizationId, user.organizationId), eq(rubrics.status, "PUBLISHED"), eq(rubrics.activeVersionId, upload.rubricVersionId))).limit(1);
-    if (!version) throw new ApiError(400, "RUBRIC_NOT_ACTIVE", "Pilih versi rubrik yang sedang aktif");
-    await putVideo(objectKey, upload.path, upload.mime); uploaded = true;
-    const submission = await db.transaction(async (tx) => {
-      const [created] = await tx.insert(submissions).values({ organizationId: user.organizationId, studentId: user.id, rubricVersionId: upload.rubricVersionId, originalFilename: upload.filename, objectKey, mimeType: upload.mime, sizeBytes: upload.size, durationMs: upload.durationMs, sha256: upload.sha256 }).returning();
-      await tx.insert(analysisJobs).values({ submissionId: created.id }); await tx.insert(submissionEvents).values({ submissionId: created.id, actorId: user.id, type: "SUBMITTED" }); return created;
-    });
-    return ok(submission, { status: 202 });
-  } catch (error) { if (uploaded) await deleteVideo(objectKey).catch(() => undefined); throw error; }
-  finally { await cleanupUpload(upload); }
-});
+export const POST = (request: Request) =>
+  route(async () => {
+    const user = await currentUser(["STUDENT"]);
+    const [profile] = await db
+      .select()
+      .from(studentProfiles)
+      .where(eq(studentProfiles.userId, user.id))
+      .limit(1);
+    const missingFields = [
+      !profile?.schoolName && "schoolName",
+      !profile?.programKeahlian && "programKeahlian",
+      !profile?.nisn && "nisn",
+      !profile?.phone && "phone",
+    ].filter((field): field is string => Boolean(field));
+    if (missingFields.length)
+      throw new ApiError(
+        409,
+        "PROFILE_INCOMPLETE",
+        "Lengkapi profil sebelum mengunggah video",
+        { missing: missingFields },
+      );
+    const upload = await parseVideoUpload(request);
+    const objectKey = `${user.organizationId}/${user.id}/${crypto.randomUUID()}`;
+    let uploaded = false;
+    try {
+      const [version] = await db
+        .select({ id: rubricVersions.id })
+        .from(rubricVersions)
+        .innerJoin(rubrics, eq(rubrics.id, rubricVersions.rubricId))
+        .where(
+          and(
+            eq(rubricVersions.id, upload.rubricVersionId),
+            eq(rubrics.organizationId, user.organizationId),
+            eq(rubrics.status, "PUBLISHED"),
+            eq(rubrics.activeVersionId, upload.rubricVersionId),
+          ),
+        )
+        .limit(1);
+      if (!version)
+        throw new ApiError(
+          400,
+          "RUBRIC_NOT_ACTIVE",
+          "Pilih versi rubrik yang sedang aktif",
+        );
+      await putVideo(objectKey, upload.path, upload.mime);
+      uploaded = true;
+      const submission = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(submissions)
+          .values({
+            organizationId: user.organizationId,
+            studentId: user.id,
+            portfolioIncluded: false,
+            rubricVersionId: upload.rubricVersionId,
+            originalFilename: upload.filename,
+            objectKey,
+            mimeType: upload.mime,
+            sizeBytes: upload.size,
+            durationMs: upload.durationMs,
+            sha256: upload.sha256,
+          })
+          .returning();
+        await tx.insert(analysisJobs).values({ submissionId: created.id });
+        await tx.insert(submissionEvents).values({
+          submissionId: created.id,
+          actorId: user.id,
+          type: "SUBMITTED",
+        });
+        return created;
+      });
+      return ok(submission, { status: 202 });
+    } catch (error) {
+      if (uploaded) await deleteVideo(objectKey).catch(() => undefined);
+      throw error;
+    } finally {
+      await cleanupUpload(upload);
+    }
+  });
 
-export const GET = (request: Request) => route(async () => {
-  const user = await currentUser(); const { page, limit, offset } = pageParams(request.url); const q = new URL(request.url).searchParams; const status = q.get("status");
-  const conditions = [eq(submissions.organizationId, user.organizationId)]; if (user.role === "STUDENT") conditions.push(eq(submissions.studentId, user.id));
-  if (status) conditions.push(eq(submissions.status, status as typeof submissions.status.enumValues[number]));
-  const where = and(...conditions); const [rows, totalRows] = await Promise.all([db.select().from(submissions).where(where).orderBy(desc(submissions.createdAt)).limit(limit).offset(offset), db.select({ count: sql<number>`count(*)::int` }).from(submissions).where(where)]);
-  return paged(rows, page, limit, totalRows[0]?.count ?? 0);
-});
+export const GET = (request: Request) =>
+  route(async () => {
+    const user = await currentUser();
+    const { page, limit, offset } = pageParams(request.url);
+    const q = new URL(request.url).searchParams;
+    const rawStatus = q.get("status");
+    const status =
+      rawStatus === null
+        ? null
+        : z.enum(submissions.status.enumValues).parse(rawStatus);
+    const conditions = [eq(submissions.organizationId, user.organizationId)];
+    if (user.role === "STUDENT")
+      conditions.push(eq(submissions.studentId, user.id));
+    if (status)
+      conditions.push(
+        eq(
+          submissions.status,
+          status as (typeof submissions.status.enumValues)[number],
+        ),
+      );
+    const studentId = q.get("studentId");
+    if (studentId)
+      conditions.push(eq(submissions.studentId, z.uuid().parse(studentId)));
+    const group = z
+      .enum(["pending", "completed"])
+      .optional()
+      .parse(q.get("group") ?? undefined);
+    if (group)
+      conditions.push(
+        group === "completed"
+          ? eq(submissions.status, "COMPLETED")
+          : sql`${submissions.status} != 'COMPLETED'`,
+      );
+    const period = z
+      .enum(["currentMonth"])
+      .optional()
+      .parse(q.get("period") ?? undefined);
+    const minScore = q.has("minScore")
+      ? z.coerce.number().min(0).max(100).parse(q.get("minScore"))
+      : null;
+    if (period)
+      conditions.push(
+        sql`${submissions.completedAt} >= date_trunc('month', now())`,
+      );
+    if (minScore !== null)
+      conditions.push(sql`${submissions.normalizedScore} >= ${minScore}`);
+    const where = and(...conditions);
+    const [rows, totalRows] = await Promise.all([
+      db
+        .select({
+          id: submissions.id,
+          organizationId: submissions.organizationId,
+          studentId: submissions.studentId,
+          studentName: users.name,
+          rubricVersionId: submissions.rubricVersionId,
+          rubricTitle: rubricVersions.title,
+          status: submissions.status,
+          originalFilename: submissions.originalFilename,
+          objectKey: submissions.objectKey,
+          mimeType: submissions.mimeType,
+          sizeBytes: submissions.sizeBytes,
+          durationMs: submissions.durationMs,
+          sha256: submissions.sha256,
+          normalizedScore: submissions.normalizedScore,
+          completedAt: submissions.completedAt,
+          createdAt: submissions.createdAt,
+          updatedAt: submissions.updatedAt,
+        })
+        .from(submissions)
+        .innerJoin(
+          rubricVersions,
+          eq(rubricVersions.id, submissions.rubricVersionId),
+        )
+        .innerJoin(users, eq(users.id, submissions.studentId))
+        .where(where)
+        .orderBy(desc(submissions.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(submissions)
+        .where(where),
+    ]);
+    return paged(rows, page, limit, totalRows[0]?.count ?? 0);
+  });

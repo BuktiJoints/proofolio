@@ -12,12 +12,16 @@ x-app-env: &app-env
   S3_BUCKET: ${S3_BUCKET:-bukti-praktik}
   S3_FORCE_PATH_STYLE: "true"
   GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-  GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+  GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.7-flash}
+  GEMINI_REQUEST_TIMEOUT_MS: ${GEMINI_REQUEST_TIMEOUT_MS:-300000}
+  GEMINI_FILE_PROCESSING_TIMEOUT_MS: ${GEMINI_FILE_PROCESSING_TIMEOUT_MS:-180000}
   FAKE_AI: ${FAKE_AI:-false}
   UPLOAD_MAX_BYTES: ${UPLOAD_MAX_BYTES:-104857600}
   UPLOAD_MAX_DURATION_SECONDS: ${UPLOAD_MAX_DURATION_SECONDS:-120}
   WORKER_POLL_MS: ${WORKER_POLL_MS:-2000}
   WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-3}
+  WORKER_LEASE_MS: ${WORKER_LEASE_MS:-300000}
+  WORKER_HEARTBEAT_MS: ${WORKER_HEARTBEAT_MS:-30000}
   SHARE_TTL_HOURS: ${SHARE_TTL_HOURS:-168}
   SEED_ASSESSOR_NAME: ${SEED_ASSESSOR_NAME:-Asesor Demo}
   SEED_ASSESSOR_EMAIL: ${SEED_ASSESSOR_EMAIL:-asesor@bukti.local}
@@ -30,7 +34,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-bukti_praktik}
       POSTGRES_USER: ${POSTGRES_USER:-bukti}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bukti_local_password}
-    ports: ["127.0.0.1:5432:5432"]
+    ports: ["127.0.0.1:${POSTGRES_PORT:-5432}:5432"]
     volumes: ["postgres_data:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bukti} -d ${POSTGRES_DB:-bukti_praktik}"]
@@ -43,7 +47,7 @@ services:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-minioadmin}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-minioadmin123}
       MINIO_DEFAULT_BUCKETS: ${S3_BUCKET:-bukti-praktik}
-    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    ports: ["127.0.0.1:${MINIO_API_PORT:-9000}:9000", "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"]
     volumes: ["minio_data:/bitnami/minio/data"]
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]

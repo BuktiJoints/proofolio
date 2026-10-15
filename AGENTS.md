@@ -31,7 +31,7 @@ akan memengaruhi data, keamanan, atau pengalaman pengguna.
 Scope backend MVP:
 
 - Registrasi, login, session, dan profil siswa.
-- Pengelolaan rubrik berversi oleh asesor dan visibilitas rubrik aktif bagi siswa.
+- Pengelolaan rubrik berversi, calon draft dari PDF berbantuan Gemini, dan visibilitas rubrik aktif bagi siswa.
 - Upload video praktik ke private object storage.
 - Analisis video asynchronous dengan Gemini berdasarkan rubrik.
 - Verifikasi manusia, pemberian skor, feedback, dan finalisasi oleh asesor.
@@ -204,7 +204,8 @@ Auth. Jangan menduplikasi password hashing atau session management di route prod
 
 - Role: authenticated `STUDENT` atau `ASSESSOR`.
 - Success `200`: `{ data: { user, profile } }`.
-- `profile` dapat `null`; student profile berisi `schoolName` dan `programKeahlian`.
+- `profile` dapat `null`; student profile berisi `nisn`, `phone`, `schoolName`,
+  `programKeahlian`, dan `notificationStatusEnabled`. `user.image` menyimpan URL foto profil.
 
 #### `PATCH /api/v1/me/profile`
 
@@ -214,14 +215,22 @@ Auth. Jangan menduplikasi password hashing atau session management di route prod
 ```json
 {
   "name": "Nama Lengkap",
+  "nisn": "1234567890",
+  "phone": "+6281234567890",
   "schoolName": "Nama Sekolah",
-  "programKeahlian": "Program Keahlian"
+  "programKeahlian": "Program Keahlian",
+  "image": "https://example.com/foto.jpg",
+  "notificationStatusEnabled": true
 }
 ```
 
-- Semua field wajib, di-trim, dan minimal 2 karakter.
+- `name`, `schoolName`, dan `programKeahlian` tetap wajib agar payload client lama kompatibel.
+  Field lain additive. NISN bila dikirim wajib 10 digit dan unik; nomor telepon dinormalisasi ke
+  format `+62`; image adalah URL atau null.
 - Success `200`: profile yang telah tersimpan.
 - Update nama user dan student profile harus atomic.
+- Upload mensyaratkan NISN, nomor telepon, sekolah, dan program keahlian lengkap. Error
+  `PROFILE_INCOMPLETE` menyertakan `fields.missing`.
 
 ### 4.3 Dashboard
 
@@ -258,7 +267,8 @@ Dalam satu version, `code` dan `order` harus unik. `maxScore` adalah integer `1.
 - Role: authenticated.
 - `STUDENT`: hanya rubric `PUBLISHED` dalam organization-nya.
 - `ASSESSOR`: semua rubric dalam organization-nya.
-- Success `200`: list rubric; `activeVersionId` menunjukkan version yang dapat dipakai upload.
+- Success `200`: list rubric; `activeVersionId` menunjukkan version yang dapat dipakai upload dan
+  `partner` berisi id/nama organization pemilik sebagai mitra UKK.
 
 #### `POST /api/v1/rubrics`
 
@@ -266,6 +276,22 @@ Dalam satu version, `code` dan `order` harus unik. `maxScore` adalah integer `1.
 - Body: `{ title, description?, criteria[] }`.
 - Success `201`: rubric `DRAFT` beserta version pertama.
 - Pembuatan rubric, version, dan criteria wajib berada dalam satu transaction.
+
+#### `POST /api/v1/rubrics/extract`
+
+- Role: `ASSESSOR`, authenticated melalui cookie Better Auth.
+- Content type: `multipart/form-data`; tepat satu field file `file`, berisi PDF maksimal 10 MiB.
+- Format diperiksa dari isi file, bukan filename atau MIME client.
+- PDF dikirim inline ke Gemini, tanpa penyimpanan object/file remote maupun row database.
+- Timeout ekstraksi 60 detik dengan abort provider; tidak ada retry otomatis yang menggandakan biaya.
+- Success `200`: `{ data: { draft: { title, description, criteria[] }, simulated, requiresHumanReview: true } }`.
+- Calon draft wajib ditinjau/diedit asesor. Simpan melalui `POST /api/v1/rubrics` atau edit draft;
+  publish tetap merupakan tindakan terpisah oleh asesor.
+- `FAKE_AI=true` mengembalikan contoh bertanda `simulated: true`, bukan ekstraksi isi dokumen.
+- Error: `400 MISSING_FIELDS / INVALID_RUBRIC_FILE`, `413 FILE_TOO_LARGE`,
+  `415 INVALID_CONTENT_TYPE / UNSUPPORTED_RUBRIC_FILE`, `503 RUBRIC_EXTRACTION_TIMEOUT /
+  RUBRIC_EXTRACTION_INVALID / RUBRIC_EXTRACTION_FAILED`. Provider error tidak diteruskan.
+- Output harus memenuhi schema rubric input, termasuk code/order unik dan maxScore integer 1..100.
 
 #### `GET /api/v1/rubrics/:id`
 
@@ -325,7 +351,8 @@ Error utama:
 - `400 MISSING_FIELDS`
 - `400 INVALID_VIDEO`
 - `413 FILE_TOO_LARGE`
-- `413 VIDEO_TOO_LONG`
+- `413 VIDEO_TOO_LONG`: pesan memuat durasi yang dibaca `ffprobe`; `fields` berisi
+  `durationMs` dan `maxDurationMs`. Batas 120 detik bersifat inklusif (120000 ms legal).
 - `415 INVALID_CONTENT_TYPE`
 - `415 UNSUPPORTED_VIDEO`
 
@@ -652,25 +679,54 @@ Bagian ini mendeskripsikan ketidaksesuaian kode saat dokumen dibuat. Ini bukan c
 dipertahankan. Hapus item hanya setelah implementation, migration bila perlu, OpenAPI, dan regression
 test selesai.
 
-1. `assertTransition` belum digunakan oleh route dan worker; status masih ditulis langsung.
-2. Edit draft rubric mengambil version tanpa ordering sehingga dapat mengubah version pertama,
-   bukan draft terbaru.
-3. Pembuatan rubric dan version pertama belum berada dalam satu transaction.
-4. Worker hanya mengambil `PENDING`/`RETRY_SCHEDULED`; abandoned `RUNNING` job tidak direclaim.
-5. Gemini file polling dan content generation belum mempunyai timeout.
-6. AI timestamp belum mewajibkan pasangan `startMs`/`endMs`; duplicate/unknown evidence belum
-   ditolak secara eksplisit.
-7. Invalid UUID dan submission status filter masih dapat menjadi generic `500`; pagination invalid
-   dapat menghasilkan metadata `null`.
-8. Submission detail belum menyaring draft review dan raw provider response untuk student.
-9. Concurrent retry dapat membuat duplicate job; concurrent review claim/finalize belum mempunyai
-   deterministic conflict handling.
-10. Scoring masih menggunakan denominator item yang dikirim client; policy criterion opsional belum
-    diterapkan dari rubric penuh.
-11. OpenAPI belum mencakup seluruh endpoint, schema, response, error, dan cookie security scheme.
-12. Default `GEMINI_MODEL` belum konsisten antara env schema, local Compose, production Compose,
-    dan `.env.example`.
-13. Repository belum memiliki GitHub Actions workflow yang menerbitkan image production ke GHCR.
-14. Audit event belum mencakup seluruh state change minimum.
-15. Test suite masih dominan unit test dan belum mencakup API, database, worker, concurrency,
-    security boundary, serta target NFR.
+1. Unit tests serta API/browser integration dengan PostgreSQL dan concurrency tersedia. Coverage
+   worker permanent failure, crash recovery, duplicate workers, production startup ordering dan
+   target NFR masih perlu dilengkapi. Migration database kosong dijalankan oleh CI.
+2. Preferensi notifikasi status baru dipersist, belum ada channel pengiriman email/push. Foto profil
+   berupa URL eksternal; managed image upload berada di luar scope MVP.
+3. Dashboard menampilkan tahap dan timestamp aktual tanpa ETA. Estimasi durasi belum diberikan karena
+   belum ada telemetry historis yang cukup untuk menghasilkan prediksi yang dapat dipercaya.
+
+## 10. WBS Web dan keputusan akses (15 Oktober 2026)
+
+- Pendaftaran asesor adalah permohonan, bukan pemberian role langsung.
+  `POST /api/v1/auth/register` menerima `intent: STUDENT | ASSESSOR`, nama, email,
+  password, sekolah/instansi, dan program keahlian. Siswa wajib NISN 10 digit
+  dan phone; asesor wajib employeeId. Success 201 dan cookie Better Auth.
+- Siswa didaftarkan dengan profil lengkap. Permohonan asesor membuat user
+  ber-role STUDENT tetapi `accessStatus=PENDING`, tanpa akses endpoint produk
+  selain `/api/v1/me`. Client tidak dapat mengatur accessStatus atau role.
+  Kegagalan penyimpanan profil/permohonan mengompensasi akun baru tersebut.
+- `/api/v1/me` additive: user.accessStatus, assessorApplication dan assessorProfile.
+  `currentUser()` membaca status terbaru dari DB; status non-ACTIVE menghasilkan
+  403 ASSESSOR_APPROVAL_PENDING / ASSESSOR_APPLICATION_REJECTED.
+- Administrator yang memiliki akses operasional database meninjau melalui
+  `bun run assessor:review`. Tidak ada endpoint HTTP publik untuk promosi role.
+  Persetujuan membutuhkan organizationId dan identitas reviewer, memakai row
+  lock, idempotent untuk keputusan yang sama, dan menyimpan waktu/reviewer.
+- `POST /api/v1/auth/login` menerima identifier dan password; identifier berupa
+  email, nomor telepon siswa unik secara lookup, atau employeeId asesor yang
+  sudah disetujui. Password dan cookie tetap dikelola Better Auth; pesan gagal
+  tidak mengungkap apakah identifier terdaftar.
+- Rubric input dan version snapshot additive: programKeahlian, partnerName,
+  requirements (opsional). Metadata historis ikut immutable setelah publish.
+  List rubric menyertakan criterionCount dan followed untuk siswa bersangkutan.
+- Dashboard additive statistics: averageScore dari seluruh hasil selesai pada
+  scope pengguna, completedThisMonth, activeRubrics. Tidak ada angka ETA buatan.
+- `GET /api/v1/assessments/students` hanya ASSESSOR, organization-scoped,
+  pagination 1..100, group pending/completed, q (nama/NISN), dan program.
+  List submission menerima studentId UUID, group pending/completed,
+  period=currentMonth dan minScore 0..100, tetap ownership/tenant-scoped.
+- Submission baru belum masuk portofolio sampai siswa memanggil
+  `POST /api/v1/submissions/:id/portfolio`; hanya hasil COMPLETED miliknya,
+  idempotent. Migration mempertahankan hasil portofolio lama.
+- `GET/POST/DELETE /api/v1/portfolio/share`: metadata aktif tanpa token; create
+  token random 256-bit yang menggantikan tautan lama; revoke idempotent.
+  Database hanya menyimpan SHA-256, expiry memakai SHARE_TTL_HOURS.
+- `GET /api/public/portfolios/:token` hanya tautan aktif/belum expired;
+  mengembalikan nama, sekolah, jurusan, foto dan hasil pilihan COMPLETED beserta
+  feedback final. Tidak mengekspos NISN, email, phone, session atau draft.
+- PDF memakai fasilitas cetak/simpan PDF browser dengan print stylesheet.
+  Dukungan dokumen rubrik tetap PDF 10 MiB; DOC belum tersedia.
+- Revisi nilai final menunggu keputusan produk; COMPLETED tetap terminal dan
+  tidak dapat diubah. Tidak ada ambang kelulusan otomatis/badge lulus buatan.

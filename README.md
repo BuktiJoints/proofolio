@@ -1,6 +1,6 @@
-# BuktiPraktik Backend
+# Proofolio / BuktiPraktik
 
-BuktiPraktik adalah backend monolitik Next.js untuk mengumpulkan video praktik siswa,
+Proofolio (BuktiPraktik) adalah aplikasi monolitik Next.js untuk mengumpulkan video praktik siswa,
 mengidentifikasi bukti keterampilan dengan Gemini, memfasilitasi verifikasi asesor, dan
 menerbitkan portofolio keterampilan yang dapat dibagikan.
 
@@ -10,6 +10,9 @@ ditentukan manusia melalui proses review asesor.
 > Kontrak engineering lengkap, keputusan arsitektur, dan aturan untuk coding agent tersedia di
 > [AGENTS.md](./AGENTS.md). README ini adalah panduan penggunaan praktis. Jika perilaku kode tidak
 > sesuai dengan kontrak target, lihat [Known limitations](#known-limitations).
+
+Panduan frontend dan alur UI: [development frontend](docs/frontend-development.md).
+Perubahan alur WBS, persetujuan asesor, dan pengujian desain utama: [panduan WBS](docs/wbs-implementation.md).
 
 ## Daftar Isi
 
@@ -77,7 +80,7 @@ Alur utamanya:
 3. Worker mengirim video privat dan snapshot rubrik ke Gemini.
 4. Evidence tervalidasi disimpan per kriteria; submission menjadi `AWAITING_REVIEW`.
 5. Asesor memverifikasi evidence, memberi skor, dan memfinalisasi penilaian.
-6. Submission `COMPLETED` muncul di portofolio dan dapat dibuatkan tautan publik.
+6. Siswa memilih hasil `COMPLETED` untuk ditambahkan ke portofolio dan dapat membagikan tautan publik.
 
 ### Komponen
 
@@ -184,9 +187,13 @@ Compose membentuk `DATABASE_URL` internal menggunakan service hostname `db`. Nil
 |---|---:|---|
 | `GEMINI_API_KEY` | Jika real AI | API key Google Gemini |
 | `GEMINI_MODEL` | Ya | Set eksplisit; `gemini-3.7-flash` telah berhasil diuji |
+| `GEMINI_REQUEST_TIMEOUT_MS` | Ya | Batas total request/download/upload/generation Gemini; default 300000 |
+| `GEMINI_FILE_PROCESSING_TIMEOUT_MS` | Ya | Batas polling file Gemini; default 180000 |
 | `FAKE_AI` | Ya | `true` hanya untuk development/demo |
 | `WORKER_POLL_MS` | Ya | Interval polling queue |
 | `WORKER_MAX_ATTEMPTS` | Ya | Batas percobaan analysis job |
+| `WORKER_LEASE_MS` | Ya | Job RUNNING dapat direclaim sesudah lease ini; default 300000 |
+| `WORKER_HEARTBEAT_MS` | Ya | Interval perpanjangan lease worker; default 30000 |
 
 Availability, quota, dan nama model dapat berubah di sisi provider. Jangan mengandalkan fallback
 model yang tidak diuji; selalu set `GEMINI_MODEL` secara eksplisit di production.
@@ -264,8 +271,8 @@ diterima, bukan analisis sudah selesai.
 
 ## API Reference
 
-Dokumentasi machine-readable tersedia di `GET /api/openapi.json`, tetapi spesifikasinya saat ini
-belum mencakup seluruh schema dan endpoint. Kontrak normatif lengkap berada di
+Dokumentasi machine-readable endpoint produk, security cookie, schema, dan errors tersedia di
+`GET /api/openapi.json`. Kontrak normatif lengkap berada di
 [AGENTS.md](./AGENTS.md#4-api-contract).
 
 ### Authentication dan profile
@@ -275,8 +282,9 @@ belum mencakup seluruh schema dan endpoint. Kontrak normatif lengkap berada di
 | `POST` | `/api/auth/sign-up/email` | Public | `200` | Registrasi siswa |
 | `POST` | `/api/auth/sign-in/email` | Public | `200` | Login dan membuat cookie session |
 | `GET` | `/api/auth/get-session` | Public/session | `200` | Mengambil session aktif |
+| `POST` | `/api/auth/change-password` | Authenticated | `200` | Mengubah password melalui Better Auth |
 | `GET` | `/api/v1/me` | Authenticated | `200` | User dan profile saat ini |
-| `PATCH` | `/api/v1/me/profile` | Student | `200` | Memperbarui nama, sekolah, dan program |
+| `PATCH` | `/api/v1/me/profile` | Student | `200` | Memperbarui profil siswa secara atomic |
 | `GET` | `/api/v1/dashboard` | Authenticated | `200` | Count status dan lima submission terbaru |
 
 Profile body:
@@ -284,16 +292,26 @@ Profile body:
 ```json
 {
   "name": "Nama Siswa",
+  "nisn": "1234567890",
+  "phone": "+6281234567890",
   "schoolName": "SMK Contoh",
-  "programKeahlian": "Teknik Komputer"
+  "programKeahlian": "Teknik Komputer",
+  "image": "https://example.com/foto.jpg",
+  "notificationStatusEnabled": true
 }
 ```
+
+`nisn`, `phone`, `image`, dan `notificationStatusEnabled` bersifat additive agar client lama tetap
+dapat menyimpan field profil lama. Namun NISN, nomor telepon, sekolah, dan program keahlian wajib
+lengkap sebelum upload. Login MVP tetap menggunakan email/password; nomor telepon adalah data
+profil, bukan identifier login. Foto profil disimpan sebagai URL, bukan file yang dikelola server.
 
 ### Rubrics
 
 | Method | Endpoint | Role | Success | Keterangan |
 |---|---|---|---:|---|
 | `GET` | `/api/v1/rubrics` | Authenticated | `200` | Student hanya melihat published rubric |
+| `POST` | `/api/v1/rubrics/extract` | Assessor | `200` | PDF maksimal 10 MiB menjadi calon draft yang perlu diverifikasi |
 | `POST` | `/api/v1/rubrics` | Assessor | `201` | Membuat rubric dan version pertama |
 | `GET` | `/api/v1/rubrics/:id` | Authenticated | `200` | Detail versions dan criteria |
 | `PUT` | `/api/v1/rubrics/:id/draft` | Assessor | `200` | Mengubah draft version terbaru |
@@ -322,6 +340,15 @@ Create/edit rubric body:
 
 Dalam satu version, `code` dan `order` harus unik. Published version tidak boleh diubah; buat
 version baru untuk revisi.
+
+### Ekstraksi PDF rubrik
+
+Asesor dapat mengirim satu PDF melalui `POST /api/v1/rubrics/extract` menggunakan field multipart
+`file`. Response berisi `draft`, `requiresHumanReview: true`, dan `simulated`. File maksimal 10 MiB,
+timeout 60 detik. Dokumen dan hasil ekstraksi tidak disimpan otomatis. Setelah memeriksa judul,
+kriteria dan bobot, simpan draft dengan endpoint rubric biasa, lalu publish secara terpisah.
+Dengan `FAKE_AI=true`, output adalah contoh simulasi, bukan pembacaan isi PDF. Mode nyata memerlukan
+`GEMINI_API_KEY` dan model yang mendukung PDF/structured output. Jika gagal, isi rubrik manual.
 
 ### Submissions dan AI analysis
 
@@ -442,8 +469,11 @@ curl -fsS -b "$STUDENT_COOKIE" -X PATCH \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "Siswa Demo",
+    "nisn": "1234567890",
+    "phone": "+6281234567890",
     "schoolName": "SMK Demo",
-    "programKeahlian": "Teknik Komputer"
+    "programKeahlian": "Teknik Komputer",
+    "notificationStatusEnabled": true
   }' \
   "$API_BASE_URL/api/v1/me/profile"
 ```
@@ -520,7 +550,24 @@ curl -fsS \
   "$API_BASE_URL/api/public/evidence/<token-dari-response>"
 ```
 
+## Rubrik demo keterampilan mengajar
+
+`bun run db:seed` juga menyiapkan **Keterampilan Mengajar (Microteaching)** sebagai rubric
+`PUBLISHED` pada default organization. Enam kriteria wajib: membuka pembelajaran (15), tujuan
+pembelajaran (10), penjelasan materi (25), interaksi peserta didik (20), komunikasi/penyajian (15),
+dan menutup pembelajaran (15), total 100 poin. Ini rubric latihan, bukan standar sertifikasi resmi.
+Seed bersifat transactional dan organization-scoped. Pengulangan tidak membuat versi/criterion
+baru atau menimpa revisi/arsip yang sudah dilakukan asesor; original version menjadi identitas seed.
+
+Untuk pengujian nyata, gunakan `FAKE_AI=false`, restart worker, lalu buat pengajuan baru dengan
+rubric microteaching. Rubric dan evidence submission lama tidak berubah ketika rubric baru dibuat.
+Jika video hanya cuplikan, bagian yang tidak terekam tidak boleh dianggap teramati. Lihat panduan
+[frontend development](./docs/frontend-development.md) untuk alur review dan pengujian.
+
 ## Development
+
+Panduan frontend, daftar halaman, dan langkah pengujian lengkap: [Frontend development](./docs/frontend-development.md).
+
 
 ### Menjalankan tanpa Docker untuk aplikasi
 
@@ -549,11 +596,13 @@ bun run worker
 | `bun run worker` | Menjalankan analysis worker |
 | `bun run db:generate` | Menghasilkan migration Drizzle dari perubahan schema |
 | `bun run db:migrate` | Menjalankan migration |
-| `bun run db:seed` | Membuat organization, asesor, bucket, dan rubric demo |
+| `bun run db:seed` | Membuat organization, asesor, bucket, serta rubric demo K3 dan microteaching |
 | `bun run lint` | ESLint |
 | `bun run typecheck` | TypeScript tanpa emit |
 | `bun run test` | Vitest sekali jalan |
 | `bun run test:watch` | Vitest watch mode |
+| `bun run test:api` | API integration dengan PostgreSQL lokal |
+| `bun run test:e2e` | API integration dan browser Chromium (web/worker/FAKE_AI diperlukan) |
 
 Verifikasi minimum sebelum commit:
 
@@ -574,19 +623,9 @@ menarik image berikut secara default:
 ghcr.io/buktijoints/buktijoints:production
 ```
 
-### Status publishing image
-
-Repository saat ini belum memiliki `.github/workflows` untuk membangun dan menerbitkan image GHCR.
-Karena itu, tag `production` tidak boleh diasumsikan tersedia. Sebelum deployment, tambahkan
-workflow GHCR atau publish image secara manual:
-
-```bash
-docker build -t ghcr.io/buktijoints/buktijoints:<immutable-tag> .
-docker push ghcr.io/buktijoints/buktijoints:<immutable-tag>
-```
-
-Kemudian set `IMAGE_TAG=<immutable-tag>` di environment server. Gunakan SHA/immutable tag untuk
-rollback; jangan hanya bergantung pada mutable tag `production`.
+Push ke `main` menerbitkan tag `production` dan tag SHA melalui
+`.github/workflows/build_and_push.yml`. Untuk rollback, set `IMAGE_TAG=sha-<commit>`; jangan hanya
+bergantung pada mutable tag `production`.
 
 ### Menjalankan production Compose
 
@@ -643,7 +682,7 @@ Catatan production:
 
 ### `PROFILE_INCOMPLETE`
 
-Lengkapi `name`, `schoolName`, dan `programKeahlian` melalui
+Lengkapi `name`, `nisn`, `phone`, `schoolName`, dan `programKeahlian` melalui
 `PATCH /api/v1/me/profile` sebelum upload.
 
 ### `RUBRIC_NOT_ACTIVE`
@@ -688,22 +727,13 @@ adalah 100 MiB dan 120 detik; server memeriksa isi file dan menjalankan `ffprobe
 
 ## Known Limitations
 
-Backend memiliki happy path end-to-end yang telah diuji, tetapi belum seluruhnya production-ready.
-Temuan terpenting saat ini:
-
-1. State transition Rule Engine sudah didefinisikan, tetapi route dan worker masih melakukan sebagian
-   status update secara langsung.
-2. Edit draft rubric dapat mengubah version pertama, bukan draft version terbaru.
-3. Job `RUNNING` yang ditinggalkan worker crash belum direclaim secara otomatis.
-4. Gemini upload polling dan generation belum mempunyai timeout eksplisit.
-5. Invalid UUID/status filter masih dapat menjadi `500`; pagination invalid dapat menghasilkan
-   metadata yang tidak valid.
-6. Submission detail belum sepenuhnya menyaring draft review/raw provider response untuk siswa.
-7. Concurrent retry, review claim, dan finalization belum memiliki deterministic conflict handling.
-8. OpenAPI belum mendokumentasikan seluruh endpoint dan schema.
-9. Default Gemini model belum konsisten di semua konfigurasi; set `GEMINI_MODEL` eksplisit.
-10. Workflow publishing GHCR, API/database integration tests, concurrency tests, load test 10 RPS,
-    dan monitoring produk belum tersedia.
+Happy path dan guard utama tersedia. Coverage otomatis yang masih perlu ditambah adalah simulasi
+worker crash/permanent failure dan duplicate worker pada PostgreSQL nyata, startup ordering
+production, load test peak 10 RPS, serta monitoring operasional. Migration database kosong sudah
+dijalankan dalam CI. Preferensi
+notifikasi baru disimpan sebagai data; pengiriman notifikasi berada di luar scope MVP. Status proses
+ditampilkan sebagai tahapan/timestamp tanpa ETA karena backend belum memiliki data historis yang
+cukup untuk memberikan estimasi yang jujur.
 
 Daftar lengkap dan target contract tersedia pada
 [Known Implementation Gaps di AGENTS.md](./AGENTS.md#9-known-implementation-gaps).
