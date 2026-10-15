@@ -12,6 +12,8 @@ test("video upload accepts 3.6 MB and inclusive duration boundary, rejects exces
     await fixture.student.context.patch("/api/v1/me/profile", {
       data: {
         name: "Upload test",
+        nisn: "1234567890",
+        phone: "+6281234567890",
         schoolName: "SMK Test",
         programKeahlian: "Teknik Komputer",
       },

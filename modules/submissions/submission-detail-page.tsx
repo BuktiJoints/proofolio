@@ -220,6 +220,12 @@ export function SubmissionDetailPage({ id, role }: { id: string; role: Role }) {
                     {item.note}
                   </CardContent>
                 )}
+                {role === "STUDENT" && (() => {
+                  const evidence = submission.analysis?.evidence.find((candidate) => candidate.criterionId === criterion.id);
+                  return evidence?.startMs !== null && evidence?.startMs !== undefined && evidence.endMs !== null
+                    ? <CardContent className="text-sm text-muted-foreground">Bukti disetujui pada {(evidence.startMs / 1000).toFixed(1)}–{(evidence.endMs / 1000).toFixed(1)} detik</CardContent>
+                    : null;
+                })()}
               </Card>
             );
           })}

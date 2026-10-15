@@ -5,10 +5,17 @@ export type User = {
   email: string;
   role: Role;
   organizationId: string;
+  image: string | null;
 };
 export type Me = {
   user: User;
-  profile: { schoolName: string | null; programKeahlian: string | null } | null;
+  profile: {
+    nisn: string | null;
+    phone: string | null;
+    schoolName: string | null;
+    programKeahlian: string | null;
+    notificationStatusEnabled: boolean;
+  } | null;
 };
 export type Envelope<T> = { data: T };
 export type Paginated<T> = Envelope<T[]> & {
@@ -25,6 +32,7 @@ export type Submission = {
   id: string;
   status: SubmissionStatus;
   rubricVersionId: string;
+  rubricTitle: string;
   originalFilename: string;
   createdAt: string;
   completedAt: string | null;
@@ -59,6 +67,7 @@ export type Rubric = {
   description: string | null;
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   activeVersionId: string | null;
+  partner?: { id: string; name: string };
   versions?: RubricVersion[];
 };
 export type ReviewDecision = "CONFIRMED" | "REJECTED" | "ADJUSTED";

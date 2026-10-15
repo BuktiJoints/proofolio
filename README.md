@@ -184,9 +184,13 @@ Compose membentuk `DATABASE_URL` internal menggunakan service hostname `db`. Nil
 |---|---:|---|
 | `GEMINI_API_KEY` | Jika real AI | API key Google Gemini |
 | `GEMINI_MODEL` | Ya | Set eksplisit; `gemini-3.7-flash` telah berhasil diuji |
+| `GEMINI_REQUEST_TIMEOUT_MS` | Ya | Batas total request/download/upload/generation Gemini; default 300000 |
+| `GEMINI_FILE_PROCESSING_TIMEOUT_MS` | Ya | Batas polling file Gemini; default 180000 |
 | `FAKE_AI` | Ya | `true` hanya untuk development/demo |
 | `WORKER_POLL_MS` | Ya | Interval polling queue |
 | `WORKER_MAX_ATTEMPTS` | Ya | Batas percobaan analysis job |
+| `WORKER_LEASE_MS` | Ya | Job RUNNING dapat direclaim sesudah lease ini; default 300000 |
+| `WORKER_HEARTBEAT_MS` | Ya | Interval perpanjangan lease worker; default 30000 |
 
 Availability, quota, dan nama model dapat berubah di sisi provider. Jangan mengandalkan fallback
 model yang tidak diuji; selalu set `GEMINI_MODEL` secara eksplisit di production.
@@ -275,8 +279,9 @@ Dokumentasi machine-readable endpoint produk, security cookie, schema, dan error
 | `POST` | `/api/auth/sign-up/email` | Public | `200` | Registrasi siswa |
 | `POST` | `/api/auth/sign-in/email` | Public | `200` | Login dan membuat cookie session |
 | `GET` | `/api/auth/get-session` | Public/session | `200` | Mengambil session aktif |
+| `POST` | `/api/auth/change-password` | Authenticated | `200` | Mengubah password melalui Better Auth |
 | `GET` | `/api/v1/me` | Authenticated | `200` | User dan profile saat ini |
-| `PATCH` | `/api/v1/me/profile` | Student | `200` | Memperbarui nama, sekolah, dan program |
+| `PATCH` | `/api/v1/me/profile` | Student | `200` | Memperbarui profil siswa secara atomic |
 | `GET` | `/api/v1/dashboard` | Authenticated | `200` | Count status dan lima submission terbaru |
 
 Profile body:
@@ -284,10 +289,19 @@ Profile body:
 ```json
 {
   "name": "Nama Siswa",
+  "nisn": "1234567890",
+  "phone": "+6281234567890",
   "schoolName": "SMK Contoh",
-  "programKeahlian": "Teknik Komputer"
+  "programKeahlian": "Teknik Komputer",
+  "image": "https://example.com/foto.jpg",
+  "notificationStatusEnabled": true
 }
 ```
+
+`nisn`, `phone`, `image`, dan `notificationStatusEnabled` bersifat additive agar client lama tetap
+dapat menyimpan field profil lama. Namun NISN, nomor telepon, sekolah, dan program keahlian wajib
+lengkap sebelum upload. Login MVP tetap menggunakan email/password; nomor telepon adalah data
+profil, bukan identifier login. Foto profil disimpan sebagai URL, bukan file yang dikelola server.
 
 ### Rubrics
 
@@ -452,8 +466,11 @@ curl -fsS -b "$STUDENT_COOKIE" -X PATCH \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "Siswa Demo",
+    "nisn": "1234567890",
+    "phone": "+6281234567890",
     "schoolName": "SMK Demo",
-    "programKeahlian": "Teknik Komputer"
+    "programKeahlian": "Teknik Komputer",
+    "notificationStatusEnabled": true
   }' \
   "$API_BASE_URL/api/v1/me/profile"
 ```
@@ -603,19 +620,9 @@ menarik image berikut secara default:
 ghcr.io/buktijoints/buktijoints:production
 ```
 
-### Status publishing image
-
-Repository saat ini belum memiliki `.github/workflows` untuk membangun dan menerbitkan image GHCR.
-Karena itu, tag `production` tidak boleh diasumsikan tersedia. Sebelum deployment, tambahkan
-workflow GHCR atau publish image secara manual:
-
-```bash
-docker build -t ghcr.io/buktijoints/buktijoints:<immutable-tag> .
-docker push ghcr.io/buktijoints/buktijoints:<immutable-tag>
-```
-
-Kemudian set `IMAGE_TAG=<immutable-tag>` di environment server. Gunakan SHA/immutable tag untuk
-rollback; jangan hanya bergantung pada mutable tag `production`.
+Push ke `main` menerbitkan tag `production` dan tag SHA melalui
+`.github/workflows/build_and_push.yml`. Untuk rollback, set `IMAGE_TAG=sha-<commit>`; jangan hanya
+bergantung pada mutable tag `production`.
 
 ### Menjalankan production Compose
 
@@ -672,7 +679,7 @@ Catatan production:
 
 ### `PROFILE_INCOMPLETE`
 
-Lengkapi `name`, `schoolName`, dan `programKeahlian` melalui
+Lengkapi `name`, `nisn`, `phone`, `schoolName`, dan `programKeahlian` melalui
 `PATCH /api/v1/me/profile` sebelum upload.
 
 ### `RUBRIC_NOT_ACTIVE`
@@ -717,18 +724,13 @@ adalah 100 MiB dan 120 detik; server memeriksa isi file dan menjalankan `ffprobe
 
 ## Known Limitations
 
-Backend memiliki happy path end-to-end yang telah diuji, tetapi belum seluruhnya production-ready.
-Temuan terpenting saat ini:
-
-1. Worker masih melakukan sebagian status update langsung; review dan retry route sudah memakai
-   transition service dan event transaction.
-2. Job `RUNNING` yang ditinggalkan worker crash belum direclaim secara otomatis.
-3. Gemini video upload polling/generation belum mempunyai timeout; ekstraksi PDF sudah dibatasi.
-4. Validasi/normalisasi AI evidence video masih perlu diperketat.
-5. Default Gemini model belum konsisten di semua konfigurasi; set `GEMINI_MODEL` eksplisit.
-6. Workflow publishing GHCR, worker failure/recovery tests, migration database kosong, load test
-   10 RPS dan monitoring produk belum tersedia. API/browser integration dan concurrency tests
-   untuk alur utama kini tersedia.
+Happy path dan guard utama tersedia. Coverage otomatis yang masih perlu ditambah adalah simulasi
+worker crash/permanent failure dan duplicate worker pada PostgreSQL nyata, startup ordering
+production, load test peak 10 RPS, serta monitoring operasional. Migration database kosong sudah
+dijalankan dalam CI. Preferensi
+notifikasi baru disimpan sebagai data; pengiriman notifikasi berada di luar scope MVP. Status proses
+ditampilkan sebagai tahapan/timestamp tanpa ETA karena backend belum memiliki data historis yang
+cukup untuk memberikan estimasi yang jujur.
 
 Daftar lengkap dan target contract tersedia pada
 [Known Implementation Gaps di AGENTS.md](./AGENTS.md#9-known-implementation-gaps).

@@ -107,7 +107,10 @@ export function RubricsPage({ role }: { role: Role }) {
                   </Badge>
                 </div>
                 <CardTitle>{rubric.title}</CardTitle>
-                <CardDescription>{rubric.description}</CardDescription>
+                <CardDescription>
+                  {rubric.partner?.name ? `Mitra: ${rubric.partner.name} · ` : ""}
+                  {rubric.description}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <LinkButton

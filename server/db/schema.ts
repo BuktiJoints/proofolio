@@ -59,8 +59,11 @@ export const verifications = pgTable("verifications", {
 export const studentProfiles = pgTable("student_profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  nisn: varchar("nisn", { length: 10 }).unique(),
+  phone: varchar("phone", { length: 20 }),
   schoolName: varchar("school_name", { length: 180 }),
   programKeahlian: varchar("program_keahlian", { length: 180 }),
+  notificationStatusEnabled: boolean("notification_status_enabled").default(true).notNull(),
   ...timestamps,
 });
 
@@ -93,7 +96,11 @@ export const analysisJobs = pgTable("analysis_jobs", {
   id: uuid("id").primaryKey().defaultRandom(), submissionId: uuid("submission_id").references(() => submissions.id, { onDelete: "cascade" }).notNull(),
   status: jobStatusEnum("status").default("PENDING").notNull(), attempts: integer("attempts").default(0).notNull(), availableAt: timestamp("available_at", { withTimezone: true }).defaultNow().notNull(),
   lockedAt: timestamp("locked_at", { withTimezone: true }), lockedBy: text("locked_by"), lastError: text("last_error"), ...timestamps,
-});
+}, (t) => [
+  uniqueIndex("analysis_job_active_unique")
+    .on(t.submissionId)
+    .where(sql`${t.status} in ('PENDING', 'RUNNING', 'RETRY_SCHEDULED')`),
+]);
 export const analysisRuns = pgTable("analysis_runs", {
   id: uuid("id").primaryKey().defaultRandom(), submissionId: uuid("submission_id").references(() => submissions.id, { onDelete: "cascade" }).notNull(),
   jobId: uuid("job_id").references(() => analysisJobs.id).notNull(), model: text("model").notNull(), promptVersion: text("prompt_version").notNull(),
@@ -103,7 +110,7 @@ export const analysisEvidence = pgTable("analysis_evidence", {
   id: uuid("id").primaryKey().defaultRandom(), analysisRunId: uuid("analysis_run_id").references(() => analysisRuns.id, { onDelete: "cascade" }).notNull(),
   criterionId: uuid("criterion_id").references(() => rubricCriteria.id).notNull(), status: evidenceStatusEnum("status").notNull(),
   startMs: integer("start_ms"), endMs: integer("end_ms"), evidence: text("evidence").notNull(), quality: evidenceQualityEnum("quality").notNull(), ...timestamps,
-});
+}, (t) => [uniqueIndex("analysis_evidence_criterion_unique").on(t.analysisRunId, t.criterionId)]);
 export const assessmentReviews = pgTable("assessment_reviews", {
   id: uuid("id").primaryKey().defaultRandom(), submissionId: uuid("submission_id").references(() => submissions.id, { onDelete: "cascade" }).notNull().unique(),
   assessorId: text("assessor_id").references(() => users.id).notNull(), feedback: text("feedback"), finalizedAt: timestamp("finalized_at", { withTimezone: true }), ...timestamps,

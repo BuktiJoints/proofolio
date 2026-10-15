@@ -6,6 +6,22 @@ test("API boundaries, extraction, immutable versions, scoring and concurrency on
   const { pool, assessor, student, outsider, secondAssessor } = fixture;
   const publicRequest = await request.newContext({ baseURL });
   try {
+    const profile = {
+      name: "Siswa API",
+      nisn: "1234567892",
+      phone: "081234567892",
+      schoolName: "SMK API",
+      programKeahlian: "Teknik Komputer",
+      notificationStatusEnabled: false,
+    };
+    expect((await student.context.patch("/api/v1/me/profile", { data: profile })).status()).toBe(200);
+    const me = (await (await student.context.get("/api/v1/me")).json()).data;
+    expect(me.profile.nisn).toBe(profile.nisn);
+    expect(me.profile.phone).toBe("+6281234567892");
+    expect(me.profile.notificationStatusEnabled).toBe(false);
+    const duplicateNisn = await outsider.context.patch("/api/v1/me/profile", { data: profile });
+    expect(duplicateNisn.status()).toBe(409);
+    expect((await duplicateNisn.json()).error.code).toBe("NISN_ALREADY_USED");
     const extract = (context: typeof assessor.context) =>
       context.post("/api/v1/rubrics/extract", {
         multipart: {
@@ -99,6 +115,13 @@ test("API boundaries, extraction, immutable versions, scoring and concurrency on
         "a".repeat(64),
       ],
     );
+    const catalog = (await (await student.context.get("/api/v1/rubrics")).json()).data;
+    expect(catalog[0].partner.name).toBe("Frontend test");
+    const history = (await (await student.context.get("/api/v1/submissions")).json()).data;
+    expect(history[0].rubricTitle).toBe(original.title);
+    const dashboard = (await (await student.context.get("/api/v1/dashboard")).json()).data;
+    expect(dashboard.counts.AWAITING_REVIEW).toBe(1);
+    expect(dashboard.recent[0].rubricTitle).toBe(original.title);
     expect(
       (await outsider.context.get(`/api/v1/submissions/${subId}`)).status(),
     ).toBe(404);

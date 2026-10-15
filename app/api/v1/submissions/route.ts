@@ -22,11 +22,18 @@ export const POST = (request: Request) =>
       .from(studentProfiles)
       .where(eq(studentProfiles.userId, user.id))
       .limit(1);
-    if (!profile?.schoolName || !profile.programKeahlian)
+    const missingFields = [
+      !profile?.schoolName && "schoolName",
+      !profile?.programKeahlian && "programKeahlian",
+      !profile?.nisn && "nisn",
+      !profile?.phone && "phone",
+    ].filter((field): field is string => Boolean(field));
+    if (missingFields.length)
       throw new ApiError(
         409,
         "PROFILE_INCOMPLETE",
         "Lengkapi profil sebelum mengunggah video",
+        { missing: missingFields },
       );
     const upload = await parseVideoUpload(request);
     const objectKey = `${user.organizationId}/${user.id}/${crypto.randomUUID()}`;
@@ -110,8 +117,26 @@ export const GET = (request: Request) =>
     const where = and(...conditions);
     const [rows, totalRows] = await Promise.all([
       db
-        .select()
+        .select({
+          id: submissions.id,
+          organizationId: submissions.organizationId,
+          studentId: submissions.studentId,
+          rubricVersionId: submissions.rubricVersionId,
+          rubricTitle: rubricVersions.title,
+          status: submissions.status,
+          originalFilename: submissions.originalFilename,
+          objectKey: submissions.objectKey,
+          mimeType: submissions.mimeType,
+          sizeBytes: submissions.sizeBytes,
+          durationMs: submissions.durationMs,
+          sha256: submissions.sha256,
+          normalizedScore: submissions.normalizedScore,
+          completedAt: submissions.completedAt,
+          createdAt: submissions.createdAt,
+          updatedAt: submissions.updatedAt,
+        })
         .from(submissions)
+        .innerJoin(rubricVersions, eq(rubricVersions.id, submissions.rubricVersionId))
         .where(where)
         .orderBy(desc(submissions.createdAt))
         .limit(limit)
