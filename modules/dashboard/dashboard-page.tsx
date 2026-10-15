@@ -2,15 +2,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api-client";
 import { useMe, profileComplete } from "@/modules/auth/session";
 import {
-  PageHeading,
   LoadingState,
   ErrorState,
   LinkButton,
+  StatusBadge,
 } from "@/modules/shared/ui";
+import { dateLabel } from "@/modules/shared/presentation";
 import { SubmissionTable } from "@/modules/submissions/submission-table";
+import { ProgressTracker } from "@/modules/submissions/progress-tracker";
 import type {
   Envelope,
   Submission,
@@ -19,6 +22,8 @@ import type {
 } from "@/modules/shared/types";
 export function DashboardPage({ role }: { role: Role }) {
   const me = useMe();
+  const student = role === "STUDENT";
+  const base = student ? "/student" : "/assessor";
   const query = useQuery({
     queryKey: ["dashboard", role],
     queryFn: () =>
@@ -26,6 +31,11 @@ export function DashboardPage({ role }: { role: Role }) {
         Envelope<{
           counts: Partial<Record<SubmissionStatus, number>>;
           recent: Submission[];
+          statistics: {
+            averageScore: string | null;
+            completedThisMonth: number;
+            activeRubrics: number;
+          };
         }>
       >("/api/v1/dashboard"),
     refetchInterval: 15000,
@@ -35,39 +45,67 @@ export function DashboardPage({ role }: { role: Role }) {
     return (
       <ErrorState error={query.error} retry={() => void query.refetch()} />
     );
-  const base = role === "STUDENT" ? "/student" : "/assessor";
-  const counts = query.data.data.counts;
-  const metrics = role === "STUDENT"
+  const { counts, recent, statistics } = query.data.data;
+  const total = Object.values(counts).reduce((s, n) => s + (n ?? 0), 0);
+  const active = recent.find((s) => s.status !== "COMPLETED");
+  const metrics = student
     ? [
-        ["Total video diunggah", Object.values(counts).reduce((total, count) => total + (count ?? 0), 0)],
-        ["Menunggu penilaian", (counts.QUEUED ?? 0) + (counts.ANALYZING ?? 0) + (counts.AWAITING_REVIEW ?? 0) + (counts.IN_REVIEW ?? 0)],
-        ["Terverifikasi", counts.COMPLETED ?? 0],
-      ] as const
+        [total, "Total pengajuan", "text-primary-70"],
+        [counts.COMPLETED ?? 0, "Terverifikasi", "text-green-70"],
+        [total - (counts.COMPLETED ?? 0), "Dalam proses", "text-yellow-70"],
+        [statistics.averageScore ?? "—", "Rata-rata skor", "text-secondary-70"],
+      ]
     : [
-        ["Menunggu review", counts.AWAITING_REVIEW ?? 0],
-        ["Sedang direview", counts.IN_REVIEW ?? 0],
-        ["Selesai", counts.COMPLETED ?? 0],
-      ] as const;
+        [counts.AWAITING_REVIEW ?? 0, "Perlu diverifikasi", "text-yellow-70"],
+        [statistics.completedThisMonth, "Selesai bulan ini", "text-green-70"],
+        [statistics.activeRubrics, "Modul UKK aktif", "text-primary-70"],
+        [counts.IN_REVIEW ?? 0, "Sedang ditinjau", "text-secondary-70"],
+      ];
   return (
     <>
-      <PageHeading
-        title={role === "STUDENT" && me.data ? `Halo, ${me.data.user.name}` : "Dashboard asesor"}
-        description={role === "STUDENT" && me.data?.profile
-          ? `${me.data.profile.nisn ?? "NISN belum diisi"} · ${me.data.profile.programKeahlian ?? "Jurusan belum diisi"} · ${me.data.profile.schoolName ?? "Sekolah belum diisi"}`
-          : "Pantau perkembangan pengajuan dan hasil penilaian praktik."}
-        action={
-          <LinkButton
-            href={
-              role === "STUDENT"
-                ? `${base}/submissions/new`
-                : `${base}/submissions`
-            }
-          >
-            {role === "STUDENT" ? "Ajukan video praktik" : "Tinjau pengajuan"}
-          </LinkButton>
-        }
-      />
-      {role === "STUDENT" && me.data && !profileComplete(me.data) && (
+      <section className="flex flex-col justify-between gap-6 rounded-2xl bg-primary-70 p-6 text-neutral-10 md:min-h-46 md:flex-row md:items-center md:p-10">
+        <div className="min-w-0 flex-1 space-y-5">
+          <h1 className="break-words text-h4 md:text-h2">
+            {student ? "Halo, " : "Selamat datang, "}
+            {me.data?.user.name}
+            {student ? "!" : ""}
+          </h1>
+          <div className="flex flex-wrap gap-2">
+            {(student
+              ? [
+                  me.data?.profile?.nisn
+                    ? `NISN ${me.data.profile.nisn}`
+                    : "NISN belum diisi",
+                  me.data?.profile?.schoolName,
+                  me.data?.profile?.programKeahlian,
+                ]
+              : [
+                  me.data?.assessorProfile?.employeeId
+                    ? `NIP ${me.data.assessorProfile.employeeId}`
+                    : "Asesor",
+                  me.data?.assessorProfile?.institution,
+                  me.data?.assessorProfile?.programKeahlian,
+                ]
+            )
+              .filter(Boolean)
+              .map((label) => (
+                <Badge
+                  key={label}
+                  className="border-0 bg-primary-20 text-b9 text-primary-70"
+                >
+                  {label}
+                </Badge>
+              ))}
+          </div>
+        </div>
+        <LinkButton
+          href={student ? "/student/rubrics" : "/assessor/submissions"}
+          variant="neutral"
+        >
+          {student ? "+ Unggah Video Praktik" : "Masuk Penilaian Siswa"}
+        </LinkButton>
+      </section>
+      {student && me.data && !profileComplete(me.data) && (
         <Alert>
           <AlertDescription>
             Lengkapi profil sebelum mengajukan video.{" "}
@@ -77,33 +115,67 @@ export function DashboardPage({ role }: { role: Role }) {
           </AlertDescription>
         </Alert>
       )}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {metrics.map(([label, count]) => (
-          <Card key={label}>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">{label}</CardTitle>
-            </CardHeader>
-            <CardContent className="text-3xl font-semibold">
-              {count}
-            </CardContent>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {metrics.map(([value, label, color]) => (
+          <Card key={String(label)} className="gap-1 p-5">
+            <p className={`text-h3 ${color}`}>{value}</p>
+            <p className="text-b8 text-neutral-70">{label}</p>
           </Card>
         ))}
       </div>
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Pengajuan terbaru</h2>
-        <LinkButton href={`${base}/submissions`} variant="ghost">
-          Lihat semua
-        </LinkButton>
-      </div>
-      <SubmissionTable submissions={query.data.data.recent.slice(0, 3)} base={base} />
-      {role === "STUDENT" && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Portofolio kompetensi</CardTitle></CardHeader>
-          <CardContent>
-            <LinkButton href="/student/portfolio" variant="outline">Lihat dan bagikan portofolio</LinkButton>
-          </CardContent>
-        </Card>
+      {student && active && (
+        <section className="space-y-4">
+          <h2 className="text-h5">Pantau perkembangan praktikmu</h2>
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="text-s6">
+                    {active.rubricTitle}
+                  </CardTitle>
+                  <p className="text-b8 text-neutral-60">
+                    Diunggah {dateLabel(active.createdAt)}
+                  </p>
+                </div>
+                <StatusBadge status={active.status} />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <ProgressTracker status={active.status} />
+              <div className="flex justify-end">
+                <LinkButton
+                  href={`/student/submissions/${active.id}`}
+                  variant="outline"
+                  className="h-9 text-s9 md:h-9 md:text-s9"
+                >
+                  Lihat detail status
+                </LinkButton>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
       )}
+      <section className="space-y-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-h5">
+            {student ? "3 pengajuan terakhir" : "Submisi Perlu Diverifikasi"}
+          </h2>
+          <LinkButton
+            href={`${base}/submissions`}
+            variant="neutral"
+            className="text-s9 md:text-s9"
+          >
+            Lihat semua
+          </LinkButton>
+        </div>
+        <SubmissionTable
+          submissions={(student
+            ? recent
+            : recent.filter((s) => s.status !== "COMPLETED")
+          ).slice(0, student ? 3 : 5)}
+          base={base}
+        />
+      </section>
     </>
   );
 }

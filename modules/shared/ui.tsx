@@ -29,7 +29,7 @@ export function PageHeading({
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h1 className="text-h5 md:text-h4">{title}</h1>
+        <h1 className="text-h5 md:text-h3">{title}</h1>
         {description && (
           <p className="mt-2 text-b8 text-muted-foreground">{description}</p>
         )}
@@ -96,16 +96,19 @@ export function LinkButton({
   href,
   children,
   variant = "default",
+  className,
 }: {
   href: string;
   children: ReactNode;
-  variant?: "default" | "outline" | "ghost";
+  variant?: "default" | "outline" | "ghost" | "neutral";
+  className?: string;
 }) {
   return (
     <Button
       role="link"
       nativeButton={false}
       variant={variant}
+      className={className}
       render={<Link href={href} />}
     >
       {children}
@@ -120,7 +123,11 @@ export function StatusBadge({ status }: { status: SubmissionStatus }) {
           ? "destructive"
           : status === "COMPLETED"
             ? "success"
-            : "info"
+            : status === "ANALYZING" || status === "QUEUED"
+              ? "secondary"
+              : status === "AWAITING_REVIEW"
+                ? "warning"
+                : "default"
       }
     >
       {statusLabels[status]}

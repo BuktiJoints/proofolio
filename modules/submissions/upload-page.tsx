@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { CriteriaList } from "@/modules/rubrics/rubric-pages";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FileUpload } from "@/components/ui/file-upload";
@@ -39,6 +40,15 @@ export function UploadPage({
     queryKey: ["rubrics", "STUDENT"],
     queryFn: () => api<Envelope<Rubric[]>>("/api/v1/rubrics"),
   });
+  const selectedRubric = rubrics.data?.data.find(
+    (r) => r.activeVersionId === versionId,
+  );
+  const detail = useQuery({
+    queryKey: ["rubric", selectedRubric?.id],
+    queryFn: () =>
+      api<Envelope<Rubric>>(`/api/v1/rubrics/${selectedRubric!.id}`),
+    enabled: !!selectedRubric,
+  });
   const upload = useMutation({
     mutationFn: (form: FormData) =>
       api<Envelope<Submission>>("/api/v1/submissions", {
@@ -51,7 +61,7 @@ export function UploadPage({
         client.invalidateQueries({ queryKey: ["dashboard"] }),
       ]);
       toast.success("Video diterima dan masuk antrean analisis");
-      router.push(`/student/submissions/${result.data.id}`);
+      router.push(`/student/submissions/${result.data.id}/success`);
     },
   });
   function submit(event: FormEvent) {
@@ -110,71 +120,97 @@ export function UploadPage({
   return (
     <>
       <PageHeading
-        title="Ajukan video praktik"
-        description="Pilih rubrik yang sesuai dan unggah bukti praktikmu."
+        title="Unggah Video Praktik"
+        description="Pelajari rubrik terlebih dahulu agar setiap indikator bukti terekam dengan jelas."
       />
-      <Card className="max-w-2xl">
-        <CardContent>
-          <form onSubmit={submit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="upload-rubric">Rubrik kompetensi</Label>
-              <Choice
-                id="upload-rubric"
-                label="Pilih rubrik kompetensi"
-                value={versionId}
-                onChange={setVersionId}
-                options={available.map((rubric) => ({
-                  value: rubric.activeVersionId!,
-                  label: rubric.title,
-                }))}
-                disabled={upload.isPending}
-              />
-              {available.find(
-                (rubric) => rubric.activeVersionId === versionId,
-              ) && (
-                <LinkButton
-                  href={`/student/rubrics/${available.find((rubric) => rubric.activeVersionId === versionId)!.id}`}
-                  variant="ghost"
-                >
-                  Pelajari rubrik
-                </LinkButton>
+      <LinkButton href="/student/rubrics" variant="neutral">
+        ← Kembali ke Modul Praktik
+      </LinkButton>
+      <div className="grid items-start gap-8 lg:grid-cols-[1.5fr_1fr]">
+        <Card>
+          <h2 className="px-6 text-h5">Form Pengumpulan</h2>
+          <CardContent>
+            <form onSubmit={submit} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="upload-rubric">Rubrik kompetensi</Label>
+                <Choice
+                  id="upload-rubric"
+                  label="Pilih rubrik kompetensi"
+                  value={versionId}
+                  onChange={setVersionId}
+                  options={available.map((rubric) => ({
+                    value: rubric.activeVersionId!,
+                    label: rubric.title,
+                  }))}
+                  disabled={upload.isPending}
+                />
+                {available.find(
+                  (rubric) => rubric.activeVersionId === versionId,
+                ) && (
+                  <LinkButton
+                    href={`/student/rubrics/${available.find((rubric) => rubric.activeVersionId === versionId)!.id}`}
+                    variant="ghost"
+                  >
+                    Pelajari rubrik
+                  </LinkButton>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="video-file">Video praktik</Label>
+                <FileUpload
+                  id="video-file"
+                  required
+                  disabled={upload.isPending}
+                  accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  MP4, WebM, atau MOV · maksimal{" "}
+                  {Math.round(maxBytes / 1024 / 1024)} MiB dan {maxSeconds}{" "}
+                  detik. Validasi akhir dilakukan server.
+                </p>
+              </div>
+              <Alert>
+                <AlertDescription>
+                  AI membantu menemukan bukti. Nilai akhir dan feedback
+                  ditentukan oleh asesor.
+                </AlertDescription>
+              </Alert>
+              {validation && (
+                <p role="alert" className="text-sm text-destructive">
+                  {validation}
+                </p>
               )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="video-file">Video praktik</Label>
-              <FileUpload
-                id="video-file"
-                required
-                disabled={upload.isPending}
-                accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              />
-              <p className="text-sm text-muted-foreground">
-                MP4, WebM, atau MOV · maksimal{" "}
-                {Math.round(maxBytes / 1024 / 1024)} MiB dan {maxSeconds} detik.
-                Validasi akhir dilakukan server.
-              </p>
-            </div>
-            <Alert>
-              <AlertDescription>
-                AI membantu menemukan bukti. Nilai akhir dan feedback ditentukan
-                oleh asesor.
-              </AlertDescription>
-            </Alert>
-            {validation && (
-              <p role="alert" className="text-sm text-destructive">
-                {validation}
-              </p>
-            )}
-            {upload.error && <ErrorState error={upload.error} />}
-            <Button type="submit" disabled={upload.isPending}>
-              {upload.isPending
-                ? "Mengirim dan memvalidasi video…"
-                : "Kirim video praktik"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+              {upload.error && <ErrorState error={upload.error} />}
+              <Button type="submit" disabled={upload.isPending}>
+                {upload.isPending
+                  ? "Mengirim dan memvalidasi video…"
+                  : "Kumpulkan Video Praktik"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+        <section className="space-y-4">
+          <h2 className="text-h5">Rubrik Kompetensi</h2>
+          {detail.isFetching ? (
+            <LoadingState />
+          ) : detail.error ? (
+            <ErrorState error={detail.error} />
+          ) : detail.data ? (
+            <CriteriaList
+              criteria={
+                detail.data.data.versions?.find((v) => v.id === versionId)
+                  ?.criteria ?? []
+              }
+            />
+          ) : (
+            <p className="text-b8 text-neutral-70">
+              Pilih modul untuk melihat kriteria penilaian sebelum mengunggah
+              video.
+            </p>
+          )}
+        </section>
+      </div>
     </>
   );
 }

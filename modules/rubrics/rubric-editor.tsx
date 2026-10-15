@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FileUpload } from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -99,10 +100,10 @@ export function RubricEditor({
     save.mutate(parsed.data);
   }
   return (
-    <div className="space-y-6">
+    <div className="grid items-start gap-8 lg:grid-cols-[1fr_1.5fr]">
       <Card>
         <CardHeader>
-          <CardTitle>Isi dari dokumen PDF</CardTitle>
+          <CardTitle>AI Document Generator</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
@@ -110,9 +111,8 @@ export function RubricEditor({
             diterbitkan.
           </p>
           <Label htmlFor="rubric-file">File rubrik PDF</Label>
-          <Input
+          <FileUpload
             id="rubric-file"
-            type="file"
             disabled={extraction.isPending || save.isPending}
             accept="application/pdf,.pdf"
             onChange={(event) => {
@@ -131,7 +131,9 @@ export function RubricEditor({
             }
             onClick={() => extraction.mutate()}
           >
-            {extraction.isPending ? "Mengekstrak PDF…" : "Ekstrak rubrik"}
+            {extraction.isPending
+              ? "Mengekstrak PDF…"
+              : "Generate Rubrik Digital via AI"}
           </Button>
           {file && file.size > 10 * 1024 * 1024 && (
             <p role="alert" className="text-sm text-destructive">
@@ -154,7 +156,10 @@ export function RubricEditor({
                 <Button
                   type="button"
                   onClick={() => {
-                    setDraft(extraction.data!.data.draft);
+                    setDraft((current) => ({
+                      ...current,
+                      ...extraction.data!.data.draft,
+                    }));
                     setValidation("");
                     extraction.reset();
                   }}
@@ -168,6 +173,13 @@ export function RubricEditor({
       </Card>
       <form onSubmit={submit}>
         <fieldset disabled={save.isPending} className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-h5">Editor Rubrik Interaktif</h2>
+            <span className="text-s9 text-primary-70">
+              Total {draft.criteria.reduce((sum, c) => sum + c.maxScore, 0)}{" "}
+              poin
+            </span>
+          </div>
           <Card>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -196,6 +208,30 @@ export function RubricEditor({
               </div>
             </CardContent>
           </Card>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(
+              [
+                { key: "programKeahlian", label: "Jurusan / Program Keahlian" },
+                { key: "partnerName", label: "Nama Mitra" },
+                {
+                  key: "requirements",
+                  label: "Persyaratan / Peralatan Praktik",
+                },
+              ] as const
+            ).map((f) => (
+              <div key={f.key} className="space-y-2">
+                <Label htmlFor={f.key}>{f.label}</Label>
+                <Input
+                  id={f.key}
+                  value={draft[f.key] ?? ""}
+                  onChange={(e) =>
+                    setDraft({ ...draft, [f.key]: e.target.value || null })
+                  }
+                  maxLength={f.key === "requirements" ? 4000 : 180}
+                />
+              </div>
+            ))}
+          </div>
           {draft.criteria.map((criterion, index) => (
             <Card key={index}>
               <CardHeader className="flex-row items-center justify-between">

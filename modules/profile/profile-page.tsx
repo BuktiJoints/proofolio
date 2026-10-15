@@ -7,18 +7,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useMe } from "@/modules/auth/session";
+import { ProfileIdentity } from "@/modules/shared/profile-identity";
+import { useMe, profileComplete } from "@/modules/auth/session";
 import { api, jsonBody } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
-import {
-  ErrorState,
-  LoadingState,
-  PageHeading,
-  LinkButton,
-} from "@/modules/shared/ui";
-import type { Envelope, Me, RubricVersion, Submission } from "@/modules/shared/types";
+import { ErrorState, LoadingState, LinkButton } from "@/modules/shared/ui";
+import type {
+  Envelope,
+  Me,
+  RubricVersion,
+  Submission,
+} from "@/modules/shared/types";
 function ProfileForm({ me }: { me: Me }) {
   const [saved, setSaved] = useState(false);
+  const [editing, setEditing] = useState(!profileComplete(me));
   const client = useQueryClient();
   const save = useMutation({
     mutationFn: (body: {
@@ -33,6 +35,7 @@ function ProfileForm({ me }: { me: Me }) {
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ["me"] });
       setSaved(true);
+      setEditing(false);
       toast.success("Profil berhasil disimpan");
     },
   });
@@ -50,9 +53,28 @@ function ProfileForm({ me }: { me: Me }) {
     });
   }
   return (
-    <Card className="max-w-2xl">
+    <Card>
       <CardContent>
-        <form onSubmit={submit} className="space-y-5">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-h5">Profil Saya</h2>
+          <Button
+            type="button"
+            variant="neutral"
+            onClick={() => setEditing(true)}
+          >
+            Edit Profil
+          </Button>
+        </div>
+        <form onSubmit={submit} className="grid gap-5 sm:grid-cols-2">
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="profile-email">Email</Label>
+            <Input
+              id="profile-email"
+              type="email"
+              value={me.user.email}
+              readOnly
+            />
+          </div>
           {[
             {
               name: "name",
@@ -99,6 +121,7 @@ function ProfileForm({ me }: { me: Me }) {
               <Label htmlFor={field.name}>{field.label}</Label>
               <Input
                 id={field.name}
+                disabled={!editing || save.isPending}
                 name={field.name}
                 defaultValue={field.value}
                 required={!field.optional}
@@ -109,10 +132,11 @@ function ProfileForm({ me }: { me: Me }) {
               />
             </div>
           ))}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 sm:col-span-2">
             <Checkbox
               id="notificationStatusEnabled"
               name="notificationStatusEnabled"
+              disabled={!editing || save.isPending}
               defaultChecked={me.profile?.notificationStatusEnabled ?? true}
             />
             <Label htmlFor="notificationStatusEnabled">
@@ -120,8 +144,8 @@ function ProfileForm({ me }: { me: Me }) {
             </Label>
           </div>
           {save.error && <ErrorState error={save.error} />}
-          <div className="flex flex-wrap gap-3">
-            <Button type="submit" disabled={save.isPending}>
+          <div className="flex flex-wrap gap-3 sm:col-span-2">
+            <Button type="submit" disabled={save.isPending || !editing}>
               {save.isPending ? "Menyimpan…" : "Simpan profil"}
             </Button>
             {saved && (
@@ -142,7 +166,8 @@ function PasswordForm() {
     event.preventDefault();
     setError("");
     setPending(true);
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const currentPassword = String(form.get("currentPassword"));
     const newPassword = String(form.get("newPassword"));
     const result = await authClient.changePassword({
@@ -155,21 +180,34 @@ function PasswordForm() {
       setError(result.error.message ?? "Password tidak dapat diubah");
       return;
     }
-    event.currentTarget.reset();
+    formElement.reset();
     toast.success("Password berhasil diubah");
   }
   return (
-    <Card className="max-w-2xl">
+    <Card>
       <CardContent>
         <form onSubmit={submit} className="space-y-5">
           <h2 className="text-lg font-semibold">Pengaturan akun</h2>
           <div className="space-y-2">
             <Label htmlFor="currentPassword">Password saat ini</Label>
-            <Input id="currentPassword" name="currentPassword" type="password" required autoComplete="current-password" />
+            <Input
+              id="currentPassword"
+              name="currentPassword"
+              type="password"
+              required
+              autoComplete="current-password"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="newPassword">Password baru</Label>
-            <Input id="newPassword" name="newPassword" type="password" required minLength={8} autoComplete="new-password" />
+            <Input
+              id="newPassword"
+              name="newPassword"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+            />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" variant="outline" disabled={pending}>
@@ -183,24 +221,36 @@ function PasswordForm() {
 function PortfolioSummary() {
   const portfolio = useQuery({
     queryKey: ["portfolio"],
-    queryFn: async () => (await api<Envelope<Array<{ submission: Submission; rubric: RubricVersion }>>>("/api/v1/portfolio")).data,
+    queryFn: async () =>
+      (
+        await api<
+          Envelope<Array<{ submission: Submission; rubric: RubricVersion }>>
+        >("/api/v1/portfolio")
+      ).data,
   });
   return (
-    <Card className="max-w-2xl">
+    <Card>
       <CardContent className="space-y-4">
         <div>
           <h2 className="text-lg font-semibold">Ringkasan portofolio</h2>
           <p className="text-sm text-muted-foreground">
-            {portfolio.data?.length ?? 0} video telah diverifikasi asesor.
+            {portfolio.data?.length ?? 0} video terverifikasi di portofolio.
           </p>
         </div>
         {portfolio.data?.slice(0, 3).map((item) => (
-          <div key={item.submission.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+          <div
+            key={item.submission.id}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+          >
             <span className="font-medium">{item.rubric.title}</span>
-            <span className="text-sm">{item.submission.normalizedScore} / 100</span>
+            <span className="text-sm">
+              {item.submission.normalizedScore} / 100
+            </span>
           </div>
         ))}
-        <LinkButton href="/student/portfolio" variant="outline">Lihat dan bagikan portofolio</LinkButton>
+        <LinkButton href="/student/portfolio" variant="outline">
+          Lihat dan bagikan portofolio
+        </LinkButton>
       </CardContent>
     </Card>
   );
@@ -211,14 +261,13 @@ export function ProfilePage() {
   if (me.error) return <ErrorState error={me.error} />;
   return (
     <>
-      <PageHeading
-        title="Profil saya"
-        description="Lengkapi nama, sekolah, dan program keahlian sebelum mengunggah video."
-      />
-      <div className="space-y-5">
+      <ProfileIdentity me={me.data} />
+      <div className="grid items-start gap-8 lg:grid-cols-[2fr_1fr]">
         <ProfileForm me={me.data} />
-        <PortfolioSummary />
-        <PasswordForm />
+        <div className="space-y-6">
+          <PortfolioSummary />
+          <PasswordForm />
+        </div>
       </div>
     </>
   );

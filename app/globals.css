@@ -660,3 +660,11 @@
   html { @apply font-sans; }
   body { @apply bg-background text-b7 text-foreground; }
 }
+
+@media print {
+  [data-app-header], nav, button, [data-slot="sheet-overlay"], [data-slot="dropdown-menu-content"], [data-slot="sonner"], [data-nextjs-dialog], .print-hidden { display: none !important; }
+  html, body { background: white !important; color: black !important; }
+  #main-content { max-width: none; padding: 0; }
+  [data-slot="card"] { break-inside: avoid; box-shadow: none; }
+  video { display: none; }
+}

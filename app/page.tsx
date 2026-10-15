@@ -1,4 +1,4 @@
-import { HomeRedirect } from "@/modules/auth/role-gate";
+import { LandingPage } from "@/modules/auth/landing-page";
 export default function Page() {
-  return <HomeRedirect />;
+  return <LandingPage />;
 }

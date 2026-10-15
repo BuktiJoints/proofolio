@@ -43,19 +43,21 @@ Sesuaikan `DATABASE_URL` dan `S3_ENDPOINT` di `.env` dengan port host. Alamat in
 
 ## Halaman dan modul
 
-| Halaman | Modul | Akses |
-|---|---|---|
-| `/` | `auth` | Redirect ke login atau dashboard role |
-| `/login`, `/register` | `auth` | Login bersama; registrasi hanya siswa |
-| `/student/profile` | `profile` | Profil siswa |
-| `/student/dashboard`, `/assessor/dashboard` | `dashboard` | Dashboard masing-masing role |
-| `/student/rubrics`, `/student/rubrics/:id` | `rubrics` | Rubrik terbit yang tersedia untuk upload |
-| `/assessor/rubrics`, `/assessor/rubrics/new`, `/assessor/rubrics/:id` | `rubrics` | Draft, ekstraksi PDF, versi, publish, archive |
-| `/student/submissions/new` | `submissions` | Upload setelah profil lengkap |
-| `/student/submissions`, `/assessor/submissions` | `submissions` | Riwayat, pagination, filter status |
-| `/student/submissions/:id`, `/assessor/submissions/:id` | `submissions`, `assessment` | Video, status, evidence, review sesuai role |
-| `/student/portfolio` | `portfolio` | Hasil selesai dan metadata share |
-| `/evidence/:token` | `evidence` | Bukti publik dari share aktif |
+| Halaman                                                               | Modul                       | Akses                                                        |
+| --------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------ |
+| `/`                                                                   | `auth`                      | Landing pilihan siswa/asesor; session aktif menuju dashboard |
+| `/login`, `/register`                                                 | `auth`                      | Masuk dan pendaftaran siswa dengan profil lengkap            |
+| `/assessor/login`, `/assessor/register`, `/assessor/pending`          | `auth`                      | Masuk asesor, pengajuan akun dan status persetujuan          |
+| `/student/profile`                                                    | `profile`                   | Profil siswa                                                 |
+| `/student/dashboard`, `/assessor/dashboard`                           | `dashboard`                 | Dashboard masing-masing role                                 |
+| `/student/rubrics`, `/student/rubrics/:id`                            | `rubrics`                   | Rubrik terbit yang tersedia untuk upload                     |
+| `/assessor/rubrics`, `/assessor/rubrics/new`, `/assessor/rubrics/:id` | `rubrics`                   | Draft, ekstraksi PDF, versi, publish, archive                |
+| `/student/submissions/new`                                            | `submissions`               | Upload setelah profil lengkap                                |
+| `/student/submissions`                                                | `submissions`               | Riwayat siswa dengan filter status                           |
+| `/assessor/submissions`, `/assessor/history`                          | `assessment`, `submissions` | Daftar siswa/UKK dan riwayat penilaian selesai               |
+| `/student/submissions/:id`, `/assessor/submissions/:id`               | `submissions`, `assessment` | Video, status, evidence, review sesuai role                  |
+| `/student/portfolio`, `/p/:token`                                     | `portfolio`                 | Hasil yang dipilih siswa dan portofolio publik               |
+| `/evidence/:token`                                                    | `evidence`                  | Bukti publik dari share aktif                                |
 
 Cookie Better Auth mengautentikasi request same-origin. `/api/v1/me` memberikan role dan profil
 aktual. Frontend mengatur navigasi role, sedangkan API tetap memeriksa ownership dan organization.
@@ -64,7 +66,8 @@ localStorage. Halaman bukti publik memakai noindex dan no-referrer.
 
 ## Pengujian manual
 
-1. Buka `/register`, buat akun siswa, isi nama sekolah dan program keahlian di profil.
+1. Buka `/register`, lengkapi nama, NISN 10 digit, sekolah, jurusan, telepon, email dan password.
+   Data profil dapat diubah melalui `/student/profile` → Edit Profil.
 2. Buka browser/profil browser terpisah untuk asesor. Login memakai akun seed sesuai `.env`.
    Dua tab dalam profil browser yang sama berbagi session; gunakan incognito atau profil berbeda.
 3. Asesor membuka Rubrik → Buat rubrik. Isi manual, atau pilih satu PDF maksimal 10 MiB → Ekstrak.
@@ -81,7 +84,8 @@ localStorage. Halaman bukti publik memakai noindex dan no-referrer.
 7. Asesor melengkapi semua nilai wajib dan feedback, lalu Finalisasi → Ya, finalisasi.
    Nilai harus integer 0..maxScore. Semua kriteria rubric masuk denominator; kriteria opsional
    yang tidak dinilai menyumbang nilai 0. Penilaian selesai tidak dapat diedit.
-8. Siswa melihat hasil final dan portofolio. Buat tautan berbagi dengan masa berlaku 1..720 jam,
+8. Siswa melihat hasil final lalu klik Tambahkan ke Digital Portofolio. Pada portofolio, buka
+   Bagikan bukti video dan buat tautan berbagi dengan masa berlaku 1..720 jam,
    salin dan buka di browser tanpa login. Identitas minimum, feedback, nilai per kriteria dan video
    harus tersedia. Cabut tautan, lalu reload halaman publik: Tautan tidak tersedia.
 9. Logout dan akses halaman terlindungi: kembali ke login. Login asesor dan akses halaman siswa:
@@ -93,7 +97,17 @@ browser. Buat share baru bila URL lama tidak lagi tersimpan.
 
 ## Pengujian otomatis
 
-Pastikan database, MinIO, web, worker berjalan, `FAKE_AI=true`, dan FFmpeg tersedia.
+Untuk pengujian terisolasi, cukup database dan MinIO lokal aktif serta FFmpeg tersedia.
+Runner membuat database/bucket sementara, menerapkan migration dari kosong, seed dua kali,
+menjalankan web/worker terpisah dalam mode simulasi, lalu membersihkan resource miliknya.
+Data development dan konfigurasi AI aplikasi utama tidak diubah.
+
+```bash
+bunx playwright install chromium
+bun run test:local
+```
+
+Perintah berikut memakai web/worker yang sudah berjalan. Pastikan `FAKE_AI=true`.
 
 ```bash
 bunx playwright install chromium
@@ -167,3 +181,8 @@ Verifikasi regresi (akun pengujian sementara dibersihkan otomatis):
 ```bash
 bunx playwright test tests/e2e/profile-schema.spec.ts
 ```
+
+## Alur WBS dan persetujuan asesor
+
+Lihat [panduan implementasi WBS](wbs-implementation.md) untuk pendaftaran asesor,
+perintah persetujuan admin, portofolio publik dan batas fitur saat ini.

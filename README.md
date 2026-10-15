@@ -1,6 +1,6 @@
-# BuktiPraktik Backend
+# Proofolio / BuktiPraktik
 
-BuktiPraktik adalah backend monolitik Next.js untuk mengumpulkan video praktik siswa,
+Proofolio (BuktiPraktik) adalah aplikasi monolitik Next.js untuk mengumpulkan video praktik siswa,
 mengidentifikasi bukti keterampilan dengan Gemini, memfasilitasi verifikasi asesor, dan
 menerbitkan portofolio keterampilan yang dapat dibagikan.
 
@@ -10,6 +10,9 @@ ditentukan manusia melalui proses review asesor.
 > Kontrak engineering lengkap, keputusan arsitektur, dan aturan untuk coding agent tersedia di
 > [AGENTS.md](./AGENTS.md). README ini adalah panduan penggunaan praktis. Jika perilaku kode tidak
 > sesuai dengan kontrak target, lihat [Known limitations](#known-limitations).
+
+Panduan frontend dan alur UI: [development frontend](docs/frontend-development.md).
+Perubahan alur WBS, persetujuan asesor, dan pengujian desain utama: [panduan WBS](docs/wbs-implementation.md).
 
 ## Daftar Isi
 
@@ -77,7 +80,7 @@ Alur utamanya:
 3. Worker mengirim video privat dan snapshot rubrik ke Gemini.
 4. Evidence tervalidasi disimpan per kriteria; submission menjadi `AWAITING_REVIEW`.
 5. Asesor memverifikasi evidence, memberi skor, dan memfinalisasi penilaian.
-6. Submission `COMPLETED` muncul di portofolio dan dapat dibuatkan tautan publik.
+6. Siswa memilih hasil `COMPLETED` untuk ditambahkan ke portofolio dan dapat membagikan tautan publik.
 
 ### Komponen
 

@@ -1,10 +1,10 @@
 import type { SubmissionStatus } from "./types";
 export const statusLabels: Record<SubmissionStatus, string> = {
-  QUEUED: "Menunggu analisis",
-  ANALYZING: "Sedang dianalisis",
+  QUEUED: "Video terkirim",
+  ANALYZING: "Sedang Diproses AI",
   ANALYSIS_FAILED: "Analisis gagal",
-  AWAITING_REVIEW: "Menunggu asesor",
-  IN_REVIEW: "Sedang direview",
+  AWAITING_REVIEW: "Menunggu Verifikasi",
+  IN_REVIEW: "Sedang Ditinjau Asesor",
   COMPLETED: "Selesai",
 };
 export const dateLabel = (value?: string | null) =>

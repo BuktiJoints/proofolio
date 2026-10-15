@@ -15,7 +15,9 @@
     "db:seed": "bun scripts/seed.ts",
     "worker": "bun server/worker/index.ts",
     "test:e2e": "playwright test",
-    "test:api": "playwright test tests/e2e/api-contract.spec.ts"
+    "test:api": "playwright test tests/e2e/api-contract.spec.ts",
+    "assessor:review": "bun scripts/review-assessor.ts",
+    "test:local": "bun scripts/test-local.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.901.0",

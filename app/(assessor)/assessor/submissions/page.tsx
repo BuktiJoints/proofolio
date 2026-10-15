@@ -1,4 +1,4 @@
-import { SubmissionsPage } from "@/modules/submissions/submissions-page";
+import { StudentsPage } from "@/modules/assessment/students-page";
 export default function Page() {
-  return <SubmissionsPage role="ASSESSOR" />;
+  return <StudentsPage />;
 }
