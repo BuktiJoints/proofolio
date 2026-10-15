@@ -43,7 +43,7 @@ test("student registration → PDF rubric → video → assessor review → port
     expect(
       await studentPage.evaluate(() =>
         getComputedStyle(document.documentElement).fontFamily.includes(
-          "GeistSans",
+          "poppins",
         ),
       ),
     ).toBe(true);
