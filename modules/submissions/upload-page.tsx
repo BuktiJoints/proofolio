@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
+import { FileUpload } from "@/components/ui/file-upload";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
@@ -142,9 +142,8 @@ export function UploadPage({
             </div>
             <div className="space-y-2">
               <Label htmlFor="video-file">Video praktik</Label>
-              <Input
+              <FileUpload
                 id="video-file"
-                type="file"
                 required
                 disabled={upload.isPending}
                 accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"

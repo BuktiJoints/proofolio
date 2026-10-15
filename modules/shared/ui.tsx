@@ -29,9 +29,9 @@ export function PageHeading({
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-h5 md:text-h4">{title}</h1>
         {description && (
-          <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-2 text-b8 text-muted-foreground">{description}</p>
         )}
       </div>
       {action}
@@ -119,8 +119,8 @@ export function StatusBadge({ status }: { status: SubmissionStatus }) {
         status === "ANALYSIS_FAILED"
           ? "destructive"
           : status === "COMPLETED"
-            ? "default"
-            : "secondary"
+            ? "success"
+            : "info"
       }
     >
       {statusLabels[status]}

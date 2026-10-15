@@ -3,6 +3,8 @@
 Sumber: [Figma — Design System](https://www.figma.com/design/k3vHSIKgjgckxhYxXtEHbI/SkillFolio?node-id=4004-3).
 Token berada di `app/globals.css`. Font disediakan lokal melalui Fontsource dan
 `next/font/local`, sehingga build dan browser tidak menghubungi Google Fonts.
+Tailwind diproses lewat `@tailwindcss/postcss` pada development dan build
+produksi (Webpack); tidak ada loader khusus development.
 
 ## Warna
 
@@ -33,3 +35,63 @@ masih menyebut Nunito diseragamkan menjadi Poppins.
 Gunakan kelas lengkap dalam source, misalnya `bg-primary-20`. Jangan membentuk
 nama kelas dinamis seperti `bg-${color}-${level}` tanpa pemetaan kelas statis,
 karena Tailwind tidak dapat menemukan kelas tersebut saat build.
+
+## Komponen
+
+Pratinjau interaktif: `/design-system` (data contoh, tanpa login).
+Komponen reusable tetap di `components/ui`; halaman pratinjau berada di
+`modules/design-system` dengan adapter tipis di `app/design-system`.
+
+- `Button`: `default` (primary), `secondary`, `destructive`, `neutral`,
+  `ghost` / `outline` (outline primary), `secondary-ghost`,
+  `destructive-ghost`, dan `link`. Ghost mengikuti Figma: outline berwarna.
+  `size="default"` tinggi 44px mobile / 48px desktop; ukuran compact tetap tersedia.
+- `Input`, `Textarea`, `Select`: background kartu, radius 12/16px, focus glow,
+  `disabled` dan `aria-invalid`. Gunakan `FieldLabel`, `FieldDescription`,
+  dan `FieldError`; hubungkan hint/error melalui `aria-describedby`.
+- `FileUpload`: komposisi Input shadcn/native; menerima props input file
+  (accept, disabled, required, onChange). Menampilkan nama file terpilih.
+- `Alert`: `info` / `default`, `success`, `warning`, `destructive`.
+- `Badge`: `default`, `secondary`, `info`, `success`, `warning`,
+  `destructive`, `outline`, `ghost`, `link`.
+- `Toggle`: chips interaktif, `default` / `outline` primary dan `secondary`.
+  State seleksi mengikuti `pressed` / `onPressedChange` dari shadcn/Base UI.
+- Accordion, Radio Group, Checkbox, Dropdown Menu mengikuti interaksi shadcn.
+- Card, Tabs, Table, Sheet, Alert Dialog, Skeleton, Separator, dan Sonner
+  memakai fondasi yang sama. Komponen tanpa desain khusus di Figma tetap
+  mengikuti struktur shadcn dengan token SkillFolio.
+
+Contoh:
+
+```tsx
+<h1 className="text-h5 md:text-h3">Portofolio siswa</h1>
+<p className="text-b8 text-secondary-70">Bukti keterampilan terverifikasi.</p>
+<Button variant="secondary-ghost">Lihat rubrik</Button>
+<Alert variant="success">
+  <AlertTitle>Berhasil</AlertTitle>
+  <AlertDescription>Video sudah diterima.</AlertDescription>
+</Alert>
+```
+
+Jangan memakai `text-s2` untuk teks kecil: sesuai Figma ukurannya 48px.
+Untuk teks antarmuka normal gunakan `text-b7` (16px), `text-b8` (14px),
+`text-s7` (16px semibold), atau `text-s8` (14px semibold).
+
+## Verifikasi
+
+Jalankan server lokal dengan `bun run dev`, lalu:
+
+```sh
+bunx playwright test tests/e2e/design-system.spec.ts
+```
+
+Pengujian memeriksa token yang dirender, font, ukuran kontrol pada lebar
+390/768/1280px, overflow, pemilihan file, dan interaksi komponen. Tidak ada
+request Gemini atau perubahan data aplikasi.
+
+Untuk memeriksa hasil produksi, jalankan `bun run build`, kemudian
+`bun run start --port 3002` dan pada terminal lain:
+
+```sh
+TEST_BASE_URL=http://localhost:3002 bunx playwright test tests/e2e/design-system.spec.ts
+```
