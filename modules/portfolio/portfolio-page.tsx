@@ -18,6 +18,7 @@ import { useMe } from "@/modules/auth/session";
 import { ProfileIdentity } from "@/modules/shared/profile-identity";
 import { PrintButton } from "@/modules/shared/print-button";
 import { PortfolioSharing } from "./portfolio-sharing";
+import { portfolioQueryOptions, type PortfolioItem } from "./queries";
 import {
   Accordion,
   AccordionItem,
@@ -31,17 +32,7 @@ import {
   EmptyState,
   LinkButton,
 } from "@/modules/shared/ui";
-import type {
-  Envelope,
-  Submission,
-  RubricVersion,
-  Share,
-} from "@/modules/shared/types";
-type PortfolioItem = {
-  submission: Submission;
-  rubric: RubricVersion;
-  shares: Share[];
-};
+import type { Envelope } from "@/modules/shared/types";
 function PortfolioCard({ item }: { item: PortfolioItem }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -184,14 +175,11 @@ function PortfolioCard({ item }: { item: PortfolioItem }) {
 }
 export function PortfolioPage() {
   const me = useMe();
-  const query = useQuery({
-    queryKey: ["portfolio"],
-    queryFn: () => api<Envelope<PortfolioItem[]>>("/api/v1/portfolio"),
-  });
+  const query = useQuery(portfolioQueryOptions);
   if (query.isPending || me.isPending) return <LoadingState />;
   if (query.error || me.error)
     return <ErrorState error={query.error ?? me.error} />;
-  const items = query.data.data;
+  const items = query.data;
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-5">

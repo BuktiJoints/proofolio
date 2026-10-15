@@ -11,13 +11,9 @@ import { ProfileIdentity } from "@/modules/shared/profile-identity";
 import { useMe, profileComplete } from "@/modules/auth/session";
 import { api, jsonBody } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
+import { portfolioQueryOptions } from "@/modules/portfolio/queries";
 import { ErrorState, LoadingState, LinkButton } from "@/modules/shared/ui";
-import type {
-  Envelope,
-  Me,
-  RubricVersion,
-  Submission,
-} from "@/modules/shared/types";
+import type { Me } from "@/modules/shared/types";
 function ProfileForm({ me }: { me: Me }) {
   const [saved, setSaved] = useState(false);
   const [editing, setEditing] = useState(!profileComplete(me));
@@ -219,15 +215,7 @@ function PasswordForm() {
   );
 }
 function PortfolioSummary() {
-  const portfolio = useQuery({
-    queryKey: ["portfolio"],
-    queryFn: async () =>
-      (
-        await api<
-          Envelope<Array<{ submission: Submission; rubric: RubricVersion }>>
-        >("/api/v1/portfolio")
-      ).data,
-  });
+  const portfolio = useQuery(portfolioQueryOptions);
   return (
     <Card>
       <CardContent className="space-y-4">

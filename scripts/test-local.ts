@@ -131,6 +131,7 @@ try {
         "tests/e2e/profile-schema.spec.ts",
         "tests/e2e/design-system.spec.ts",
         "tests/e2e/main-design.spec.ts",
+        "tests/e2e/portfolio-navigation.spec.ts",
       ];
   await command(["x", "playwright", "test", ...specs], true);
 } catch (error) {

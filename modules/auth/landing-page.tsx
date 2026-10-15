@@ -51,7 +51,7 @@ export function LandingPage() {
               {[false, true].map((assessor) => (
                 <Card
                   key={String(assessor)}
-                  className={`relative overflow-hidden rounded-2xl border p-8 shadow-none ring-0 ${assessor ? "border-primary-90 bg-primary-90 text-neutral-10" : "border-primary-20 shadow-[0_24px_48px_-24px_var(--color-primary-40)]"}`}
+                  className={`relative overflow-hidden rounded-2xl border p-8 shadow-none ring-0 transition-shadow duration-200 hover:shadow-[0_24px_48px_-24px_var(--color-primary-40)] ${assessor ? "border-primary-90 bg-primary-90 text-neutral-10" : "border-primary-20"}`}
                 >
                   <span
                     aria-hidden="true"

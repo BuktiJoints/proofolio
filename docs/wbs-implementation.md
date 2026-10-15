@@ -99,3 +99,19 @@ bun run test:local tests/e2e/workflow.spec.ts
 
 Runner menggunakan database dan bucket sementara, mengecek migration dari kosong dan seed dua kali,
 serta membersihkan resource pengujiannya. Pemeriksaan ini tidak menilai kualitas analisis Gemini nyata.
+
+## Skenario pengujian manual setelah perbaikan UI
+
+Gunakan profil browser berbeda untuk siswa dan asesor agar session tidak tertukar.
+
+| Kasus | Langkah | Hasil yang diharapkan |
+| --- | --- | --- |
+| Hover kartu peran | Buka `/`, arahkan kursor bergantian ke kartu siswa dan asesor, lalu keluar dari kartu. | Kartu tanpa shadow saat diam; shadow muncul hanya selama hover. |
+| Rubrik dan poin | Siswa membuka detail modul, lalu buka/tutup beberapa kriteria. Ulangi pada layar sempit. | Seluruh poin sejajar di kanan dekat chevron, judul tetap terbaca dan deskripsi dapat dibuka. |
+| Navigasi portofolio | Buka Profil → Lihat dan bagikan portofolio → Profil → Portofolio tanpa reload. Ulangi pada akun kosong dan akun yang punya hasil. | Tidak crash; ringkasan dan daftar konsisten. Akun kosong menampilkan pesan belum memiliki hasil. |
+| Pengajuan asesor | Daftar di `/assessor/register`, lalu coba membuka dashboard sebelum dan setelah approval admin. | Sebelum approval tampil halaman menunggu dan data siswa tidak dapat diakses; setelah approval dashboard tersedia. |
+| Upload dan proses | Siswa memilih modul sesuai isi video lalu mengunggah video yang memenuhi batas di halaman upload. | Halaman sukses muncul; status berlanjut dari antrean/analisis ke menunggu review setelah worker selesai. |
+| Bukti dan timestamp | Asesor membuka pengajuan dengan bukti bertimestamp dan bukti tanpa timestamp, lalu klik waktu yang valid. | Kolom waktu berukuran sama dan teks kriteria sejajar; waktu valid menggeser video, tanda — tidak dapat diklik. |
+| Draft dan hasil final | Asesor simpan sebagian nilai/feedback, reload, periksa detail siswa, lalu lengkapi dan finalisasi. | Draft tersimpan dan belum terlihat siswa. Setelah finalisasi, siswa melihat skor/feedback final. |
+| Portofolio dan akses publik | Tambahkan hasil selesai ke portofolio, aktifkan Publik, buka link di incognito, lalu ubah ke Pribadi. | Hanya hasil terpilih tampil; link dapat dibuka tanpa login dan tidak lagi valid setelah dicabut. |
+| Validasi dan batas akses | Coba video di atas batas ukuran/durasi, skor lebih besar dari poin maksimal, serta URL detail milik akun/organisasi lain. | Input tidak valid ditolak dengan pesan yang aman; data pihak lain tidak tampil. |

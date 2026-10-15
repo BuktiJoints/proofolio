@@ -39,11 +39,16 @@ export function CriteriaList({ criteria }: { criteria: Criterion[] }) {
     <Accordion>
       {criteria.map((c) => (
         <AccordionItem key={c.id} value={c.id}>
-          <AccordionTrigger>
-            <span>
+          <AccordionTrigger className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4">
+            <span className="min-w-0">
               {c.order}. {c.title}
             </span>
-            <span className="ml-auto text-b9">{c.maxScore} poin</span>
+            <span
+              data-testid="criterion-points"
+              className="shrink-0 text-right text-b9 tabular-nums"
+            >
+              {c.maxScore} poin
+            </span>
           </AccordionTrigger>
           <AccordionContent>
             <p className="whitespace-pre-wrap">{c.description}</p>

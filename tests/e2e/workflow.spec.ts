@@ -194,6 +194,12 @@ test("student registration → PDF rubric → video → assessor review → port
     await studentPage
       .getByRole("link", { name: "Lihat Detail & Rubrik", exact: true })
       .click();
+    const points = await studentPage
+      .getByTestId("criterion-points")
+      .evaluateAll((items) =>
+        items.map((item) => item.getBoundingClientRect().right),
+      );
+    expect(Math.max(...points) - Math.min(...points)).toBeLessThan(1);
     await studentPage
       .getByRole("link", {
         name: "Pilih Modul & Unggah Video Praktik",
@@ -301,6 +307,40 @@ test("student registration → PDF rubric → video → assessor review → port
       .getByRole("button", { name: "Ya, finalisasi", exact: true })
       .click();
     await expect(assessorPage.getByTestId("final-score")).toBeVisible();
+    // Missing evidence timestamps must occupy the same column as actual timestamps.
+    await fixture.pool.query(
+      "update analysis_evidence set start_ms=null, end_ms=null where id=(select id from analysis_evidence where analysis_run_id in (select id from analysis_runs where submission_id=$1) order by id limit 1)",
+      [submissionId],
+    );
+    await assessorPage.reload();
+    await expect(
+      assessorPage.getByTestId("evidence-timestamp").first(),
+    ).toBeVisible();
+    const timestampBoxes = await assessorPage
+      .getByTestId("evidence-timestamp")
+      .evaluateAll((items) =>
+        items.map((item) => {
+          const r = item.getBoundingClientRect();
+          return {
+            width: r.width,
+            height: r.height,
+            left: r.left,
+            disabled: (item as HTMLButtonElement).disabled,
+          };
+        }),
+      );
+    expect(timestampBoxes.some((box) => box.disabled)).toBe(true);
+    expect(timestampBoxes.some((box) => !box.disabled)).toBe(true);
+    expect(
+      new Set(
+        timestampBoxes.map((box) => `${box.width}/${box.height}/${box.left}`),
+      ).size,
+    ).toBe(1);
+
+    await capture(assessorPage, "evidence-aligned-desktop");
+    await assessorPage.setViewportSize({ width: 390, height: 844 });
+    await capture(assessorPage, "evidence-aligned-mobile");
+    await assessorPage.setViewportSize({ width: 1280, height: 900 });
     await studentPage.reload();
     await expect(studentPage.getByTestId("final-score")).toBeVisible();
     await studentPage

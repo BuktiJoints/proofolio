@@ -42,3 +42,37 @@ for (const width of [390, 768, 1440])
     ).toBe(true);
     expect(errors).toEqual([]);
   });
+
+test("landing role cards show their shadow only on hover", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1024 });
+  await page.goto("/");
+  for (const title of ["Masuk sebagai Siswa", "Masuk sebagai Asesor / Guru"]) {
+    const card = page
+      .locator('[data-slot="card"]')
+      .filter({ has: page.getByRole("heading", { name: title, exact: true }) });
+    await page.mouse.move(0, 0);
+    await expect
+      .poll(() =>
+        card.evaluate((element) =>
+          getComputedStyle(element).getPropertyValue("--tw-shadow").trim(),
+        ),
+      )
+      .toBe("0 0 #0000");
+    await card.hover();
+    await expect
+      .poll(() =>
+        card.evaluate((element) =>
+          getComputedStyle(element).getPropertyValue("--tw-shadow").trim(),
+        ),
+      )
+      .not.toBe("0 0 #0000");
+    await page.mouse.move(0, 0);
+    await expect
+      .poll(() =>
+        card.evaluate((element) =>
+          getComputedStyle(element).getPropertyValue("--tw-shadow").trim(),
+        ),
+      )
+      .toBe("0 0 #0000");
+  }
+});

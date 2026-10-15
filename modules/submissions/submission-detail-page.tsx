@@ -95,12 +95,17 @@ export function SubmissionDetailPage({ id, role }: { id: string; role: Role }) {
               evidence.endMs >= evidence.startMs &&
               evidence.endMs <= s.durationMs;
             return (
-              <div key={c.id} className="flex flex-wrap items-start gap-3 py-4">
+              <div
+                key={c.id}
+                data-testid="evidence-row"
+                className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-3 py-4 sm:grid-cols-[3.5rem_minmax(0,1fr)_auto]"
+              >
                 <Button
                   aria-label={`Lihat bukti ${c.title}`}
                   variant="link"
                   size="sm"
-                  className="h-8 shrink-0 px-0 text-s9 md:text-s9"
+                  data-testid="evidence-timestamp"
+                  className="h-8 w-14 min-w-14 shrink-0 px-0 text-s9 tabular-nums disabled:bg-transparent disabled:text-neutral-60 md:text-s9"
                   disabled={!validTime}
                   onClick={() => {
                     if (
@@ -123,7 +128,7 @@ export function SubmissionDetailPage({ id, role }: { id: string; role: Role }) {
                         .padStart(2, "0")}`
                     : "—"}
                 </Button>
-                <div className="min-w-40 flex-1 space-y-1">
+                <div className="min-w-0 space-y-1">
                   <p className="text-s8">{c.title}</p>
                   <p className="whitespace-pre-wrap text-b9 text-neutral-70">
                     {evidence?.evidence ?? "Bukti AI belum tersedia."}
@@ -141,7 +146,7 @@ export function SubmissionDetailPage({ id, role }: { id: string; role: Role }) {
                   )}
                 </div>
                 {update ? (
-                  <div className="flex gap-2">
+                  <div className="col-start-2 flex gap-2 sm:col-start-3 sm:row-start-1">
                     <Button
                       size="xs"
                       variant={decision === "REJECTED" ? "outline" : "default"}
@@ -161,6 +166,7 @@ export function SubmissionDetailPage({ id, role }: { id: string; role: Role }) {
                   </div>
                 ) : decision ? (
                   <Badge
+                    className="col-start-2 justify-self-start sm:col-start-3 sm:row-start-1 sm:justify-self-end"
                     variant={
                       decision === "REJECTED" ? "destructive" : "success"
                     }
