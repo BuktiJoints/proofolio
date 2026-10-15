@@ -37,13 +37,26 @@ test("student registration → PDF rubric → video → assessor review → port
     );
     const screenshots = process.env.TEST_SCREENSHOTS;
     if (screenshots) mkdirSync(screenshots, { recursive: true });
+    async function capture(page: typeof studentPage, name: string) {
+      await page.evaluate(() => document.fonts.ready);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      if (screenshots)
+        await page.screenshot({
+          path: join(screenshots, `${name}.png`),
+          fullPage: true,
+        });
+    }
     const registeredEmail = `browser-${fixture.run}@example.test`;
     await studentPage.goto("/register");
     await studentPage.evaluate(() => document.fonts.ready);
     expect(
       await studentPage.evaluate(() =>
         getComputedStyle(document.documentElement).fontFamily.includes(
-          "GeistSans",
+          "poppins",
         ),
       ),
     ).toBe(true);
@@ -56,12 +69,23 @@ test("student registration → PDF rubric → video → assessor review → port
     await studentPage
       .getByLabel("Kata sandi", { exact: true })
       .fill(fixture.password);
+    await studentPage.getByLabel("NISN", { exact: true }).fill("1234567891");
     await studentPage
-      .getByRole("button", { name: "Daftar", exact: true })
+      .getByLabel("Nomor telepon", { exact: true })
+      .fill("081234567891");
+    await studentPage
+      .getByLabel("Asal Sekolah SMK", { exact: true })
+      .fill("SMK Pengujian");
+    await studentPage
+      .getByLabel("Jurusan / Bidang Keahlian", { exact: true })
+      .fill("Teknik Komputer");
+    await studentPage
+      .getByRole("button", { name: "Buat Akun Siswa", exact: true })
       .click();
     await expect(
-      studentPage.getByRole("heading", { name: "Profil saya" }),
+      studentPage.getByRole("heading", { name: "Halo, Siswa pengujian!" }),
     ).toBeVisible();
+    await capture(studentPage, "student-dashboard-desktop");
     const registered = await fixture.pool.query(
       "select id from users where email=$1",
       [registeredEmail],
@@ -72,16 +96,11 @@ test("student registration → PDF rubric → video → assessor review → port
       "update users set organization_id=$1 where id=$2",
       [fixture.orgId, studentId],
     );
-    await studentPage.goto("/student/submissions/new");
-    await expect(
-      studentPage.getByText("Lengkapi profil terlebih dahulu", { exact: true }),
-    ).toBeVisible();
+    await studentPage.goto("/student/profile");
     await studentPage
-      .getByRole("link", { name: "Lengkapi profil", exact: true })
+      .getByRole("button", { name: "Edit Profil", exact: true })
       .click();
-    await studentPage
-      .getByLabel("NISN", { exact: true })
-      .fill("1234567891");
+    await studentPage.getByLabel("NISN", { exact: true }).fill("1234567891");
     await studentPage
       .getByLabel("Nomor telepon", { exact: true })
       .fill("081234567891");
@@ -97,19 +116,20 @@ test("student registration → PDF rubric → video → assessor review → port
     await expect(
       studentPage.getByText("Profil berhasil disimpan", { exact: true }),
     ).toBeVisible();
-    await assessorPage.goto("/login");
+    await assessorPage.goto("/assessor/login");
     await assessorPage
-      .getByLabel("Email", { exact: true })
+      .getByLabel("Email / NIP", { exact: true })
       .fill(fixture.assessor.email);
     await assessorPage
       .getByLabel("Kata sandi", { exact: true })
       .fill(fixture.password);
     await assessorPage
-      .getByRole("button", { name: "Masuk", exact: true })
+      .getByRole("button", { name: "Masuk Portal Asesor", exact: true })
       .click();
     await expect(
-      assessorPage.getByRole("heading", { name: "Dashboard asesor" }),
+      assessorPage.getByRole("heading", { name: /Selamat datang/ }),
     ).toBeVisible();
+    await capture(assessorPage, "assessor-dashboard-desktop");
     await assessorPage.goto("/assessor/rubrics/new");
     await assessorPage
       .getByLabel("File rubrik PDF", { exact: true })
@@ -119,7 +139,10 @@ test("student registration → PDF rubric → video → assessor review → port
         buffer: pdfFixture(),
       });
     await assessorPage
-      .getByRole("button", { name: "Ekstrak rubrik", exact: true })
+      .getByRole("button", {
+        name: "Generate Rubrik Digital via AI",
+        exact: true,
+      })
       .click();
     await expect(
       assessorPage.getByText(/Mode simulasi: hasil contoh/),
@@ -167,12 +190,19 @@ test("student registration → PDF rubric → video → assessor review → port
     ).toBeVisible();
     await studentPage.goto("/student/rubrics");
     await expect(studentPage.getByText(title, { exact: true })).toBeVisible();
+    await capture(studentPage, "catalog-desktop");
     await studentPage
-      .getByRole("link", { name: "Lihat rubrik", exact: true })
+      .getByRole("link", { name: "Lihat Detail & Rubrik", exact: true })
       .click();
+    const points = await studentPage
+      .getByTestId("criterion-points")
+      .evaluateAll((items) =>
+        items.map((item) => item.getBoundingClientRect().right),
+      );
+    expect(Math.max(...points) - Math.min(...points)).toBeLessThan(1);
     await studentPage
       .getByRole("link", {
-        name: "Ajukan video dengan rubrik ini",
+        name: "Pilih Modul & Unggah Video Praktik",
         exact: true,
       })
       .click();
@@ -180,7 +210,15 @@ test("student registration → PDF rubric → video → assessor review → port
       .getByLabel("Video praktik", { exact: true })
       .setInputFiles(join(dir, "practice.mp4"));
     await studentPage
-      .getByRole("button", { name: "Kirim video praktik", exact: true })
+      .getByRole("button", { name: "Kumpulkan Video Praktik", exact: true })
+      .click();
+    await expect(
+      studentPage.getByRole("heading", {
+        name: "Video praktik berhasil dikumpulkan!",
+      }),
+    ).toBeVisible();
+    await studentPage
+      .getByRole("link", { name: "Pantau Status Penilaian", exact: true })
       .click();
     await expect(
       studentPage.getByRole("heading", { name: title, exact: true }),
@@ -209,7 +247,7 @@ test("student registration → PDF rubric → video → assessor review → port
       .click();
     await expect(
       assessorPage.getByRole("heading", {
-        name: "Penilaian asesor",
+        name: "Detail Penilaian",
         exact: true,
       }),
     ).toBeVisible();
@@ -222,6 +260,11 @@ test("student registration → PDF rubric → video → assessor review → port
         .locator("video")
         .evaluate((video: HTMLVideoElement) => video.currentTime >= 0),
     ).toBe(true);
+    await expect(
+      assessorPage.getByLabel("Nilai Melakukan prosedur praktik", {
+        exact: true,
+      }),
+    ).toBeVisible();
     if (screenshots) {
       await assessorPage.evaluate(() => window.scrollTo(0, 0));
       await assessorPage.screenshot({
@@ -255,19 +298,67 @@ test("student registration → PDF rubric → video → assessor review → port
       }),
     ).toHaveValue("64");
     await assessorPage
-      .getByRole("button", { name: "Finalisasi penilaian", exact: true })
+      .getByRole("button", {
+        name: "Simpan & Terbitkan Penilaian",
+        exact: true,
+      })
       .click();
     await assessorPage
       .getByRole("button", { name: "Ya, finalisasi", exact: true })
       .click();
+    await expect(assessorPage.getByTestId("final-score")).toBeVisible();
+    // Missing evidence timestamps must occupy the same column as actual timestamps.
+    await fixture.pool.query(
+      "update analysis_evidence set start_ms=null, end_ms=null where id=(select id from analysis_evidence where analysis_run_id in (select id from analysis_runs where submission_id=$1) order by id limit 1)",
+      [submissionId],
+    );
+    await assessorPage.reload();
     await expect(
-      assessorPage.getByText("Skor akhir: 64.00 / 100", { exact: true }),
+      assessorPage.getByTestId("evidence-timestamp").first(),
     ).toBeVisible();
+    const timestampBoxes = await assessorPage
+      .getByTestId("evidence-timestamp")
+      .evaluateAll((items) =>
+        items.map((item) => {
+          const r = item.getBoundingClientRect();
+          return {
+            width: r.width,
+            height: r.height,
+            left: r.left,
+            disabled: (item as HTMLButtonElement).disabled,
+          };
+        }),
+      );
+    expect(timestampBoxes.some((box) => box.disabled)).toBe(true);
+    expect(timestampBoxes.some((box) => !box.disabled)).toBe(true);
+    expect(
+      new Set(
+        timestampBoxes.map((box) => `${box.width}/${box.height}/${box.left}`),
+      ).size,
+    ).toBe(1);
+
+    await capture(assessorPage, "evidence-aligned-desktop");
+    await assessorPage.setViewportSize({ width: 390, height: 844 });
+    await capture(assessorPage, "evidence-aligned-mobile");
+    await assessorPage.setViewportSize({ width: 1280, height: 900 });
     await studentPage.reload();
+    await expect(studentPage.getByTestId("final-score")).toBeVisible();
+    await studentPage
+      .getByRole("button", {
+        name: "Tambahkan ke Digital Portofolio",
+        exact: true,
+      })
+      .click();
     await expect(
-      studentPage.getByText("Skor akhir: 64.00 / 100", { exact: true }),
+      studentPage.getByRole("heading", {
+        name: "Daftar Bukti Kompetensi",
+        exact: true,
+      }),
     ).toBeVisible();
-    await studentPage.goto("/student/portfolio");
+    await capture(studentPage, "portfolio-desktop");
+    await studentPage
+      .getByRole("button", { name: "Bagikan bukti video", exact: true })
+      .click();
     await studentPage
       .getByRole("button", { name: "Buat tautan berbagi", exact: true })
       .click();
@@ -301,20 +392,39 @@ test("student registration → PDF rubric → video → assessor review → port
       .click();
     await expect(studentPage.getByRole("dialog")).toBeVisible();
     await studentPage.keyboard.press("Escape");
-    if (screenshots)
-      await studentPage.screenshot({
-        path: join(screenshots, "dashboard-mobile.png"),
-        fullPage: true,
-      });
+    await expect(
+      studentPage.getByRole("heading", {
+        name: "Halo, Siswa pengujian!",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await capture(studentPage, "dashboard-mobile");
+    for (const [path, title] of [
+      ["/student/profile", "Profil Saya"],
+      ["/student/portfolio", "Daftar Bukti Kompetensi"],
+      ["/student/rubrics", "Eksplorasi Uji Kompetensi Keahlian (UKK)"],
+    ]) {
+      await studentPage.goto(path);
+      await expect(
+        studentPage.getByRole("heading", { name: title, exact: true }),
+      ).toBeVisible();
+      await capture(studentPage, `${path.split("/").at(-1)}-mobile`);
+    }
     await studentPage
       .getByRole("button", { name: "Keluar", exact: true })
       .click();
     await expect(
-      studentPage.getByRole("heading", { name: "Masuk ke akun", exact: true }),
+      studentPage.getByRole("heading", {
+        name: "Selamat Datang di Platform Verifikasi Kompetensi SMK",
+        exact: true,
+      }),
     ).toBeVisible();
     await studentPage.goto("/assessor/dashboard");
     await expect(
-      studentPage.getByRole("heading", { name: "Masuk ke akun", exact: true }),
+      studentPage.getByRole("heading", {
+        name: "Masuk ke Akun Siswa",
+        exact: true,
+      }),
     ).toBeVisible();
     expect(failures.length).toBe(0);
   } finally {

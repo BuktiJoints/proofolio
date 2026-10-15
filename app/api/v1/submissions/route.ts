@@ -9,6 +9,7 @@ import {
   studentProfiles,
   submissionEvents,
   submissions,
+  users,
 } from "@/server/db/schema";
 import { deleteVideo, putVideo } from "@/server/integrations/storage";
 import { ApiError, ok, pageParams, paged, route } from "@/server/http";
@@ -66,6 +67,7 @@ export const POST = (request: Request) =>
           .values({
             organizationId: user.organizationId,
             studentId: user.id,
+            portfolioIncluded: false,
             rubricVersionId: upload.rubricVersionId,
             originalFilename: upload.filename,
             objectKey,
@@ -76,13 +78,11 @@ export const POST = (request: Request) =>
           })
           .returning();
         await tx.insert(analysisJobs).values({ submissionId: created.id });
-        await tx
-          .insert(submissionEvents)
-          .values({
-            submissionId: created.id,
-            actorId: user.id,
-            type: "SUBMITTED",
-          });
+        await tx.insert(submissionEvents).values({
+          submissionId: created.id,
+          actorId: user.id,
+          type: "SUBMITTED",
+        });
         return created;
       });
       return ok(submission, { status: 202 });
@@ -114,6 +114,32 @@ export const GET = (request: Request) =>
           status as (typeof submissions.status.enumValues)[number],
         ),
       );
+    const studentId = q.get("studentId");
+    if (studentId)
+      conditions.push(eq(submissions.studentId, z.uuid().parse(studentId)));
+    const group = z
+      .enum(["pending", "completed"])
+      .optional()
+      .parse(q.get("group") ?? undefined);
+    if (group)
+      conditions.push(
+        group === "completed"
+          ? eq(submissions.status, "COMPLETED")
+          : sql`${submissions.status} != 'COMPLETED'`,
+      );
+    const period = z
+      .enum(["currentMonth"])
+      .optional()
+      .parse(q.get("period") ?? undefined);
+    const minScore = q.has("minScore")
+      ? z.coerce.number().min(0).max(100).parse(q.get("minScore"))
+      : null;
+    if (period)
+      conditions.push(
+        sql`${submissions.completedAt} >= date_trunc('month', now())`,
+      );
+    if (minScore !== null)
+      conditions.push(sql`${submissions.normalizedScore} >= ${minScore}`);
     const where = and(...conditions);
     const [rows, totalRows] = await Promise.all([
       db
@@ -121,6 +147,7 @@ export const GET = (request: Request) =>
           id: submissions.id,
           organizationId: submissions.organizationId,
           studentId: submissions.studentId,
+          studentName: users.name,
           rubricVersionId: submissions.rubricVersionId,
           rubricTitle: rubricVersions.title,
           status: submissions.status,
@@ -136,7 +163,11 @@ export const GET = (request: Request) =>
           updatedAt: submissions.updatedAt,
         })
         .from(submissions)
-        .innerJoin(rubricVersions, eq(rubricVersions.id, submissions.rubricVersionId))
+        .innerJoin(
+          rubricVersions,
+          eq(rubricVersions.id, submissions.rubricVersionId),
+        )
+        .innerJoin(users, eq(users.id, submissions.studentId))
         .where(where)
         .orderBy(desc(submissions.createdAt))
         .limit(limit)

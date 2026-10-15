@@ -27,7 +27,7 @@ const response = (description: string, schema: Schema) => ({
   content: { "application/json": { schema } },
 });
 const errors = Object.fromEntries(
-  [400, 401, 403, 404, 409, 413, 415, 503].map((status) => [
+  [400, 401, 403, 404, 409, 413, 415, 429, 503].map((status) => [
     status,
     response("Error aman dengan requestId", ref("Error")),
   ]),
@@ -60,6 +60,11 @@ const rubricSchema: Schema = {
     id: uuid,
     title: str,
     description: { type: ["string", "null"] },
+    programKeahlian: { type: ["string", "null"] },
+    partnerName: { type: ["string", "null"] },
+    requirements: { type: ["string", "null"] },
+    criterionCount: { type: "integer" },
+    followed: { type: "boolean" },
     status: { enum: ["DRAFT", "PUBLISHED", "ARCHIVED"] },
     activeVersionId: { type: ["string", "null"], format: "uuid" },
     partner: {
@@ -73,7 +78,7 @@ export const openapi = {
   openapi: "3.1.0",
   info: {
     title: "BuktiPraktik API",
-    version: "1.2.0",
+    version: "1.3.0",
     description:
       "AI menghasilkan calon bukti dan draft rubrik. Penilaian akhir dan penerbitan rubrik tetap dilakukan asesor.",
   },
@@ -113,6 +118,7 @@ export const openapi = {
           email: { type: "string", format: "email" },
           role: { enum: ["STUDENT", "ASSESSOR"] },
           organizationId: uuid,
+          accessStatus: { enum: ["ACTIVE", "PENDING", "REJECTED"] },
           image: { type: ["string", "null"], format: "uri" },
         },
       },
@@ -157,6 +163,9 @@ export const openapi = {
         properties: {
           title: { type: "string", minLength: 2, maxLength: 180 },
           description: { type: ["string", "null"], maxLength: 4000 },
+          programKeahlian: { type: ["string", "null"], maxLength: 180 },
+          partnerName: { type: ["string", "null"], maxLength: 180 },
+          requirements: { type: ["string", "null"], maxLength: 4000 },
           criteria: {
             ...array(ref("CriterionInput")),
             minItems: 1,
@@ -178,6 +187,9 @@ export const openapi = {
           version: { type: "integer" },
           title: str,
           description: { type: ["string", "null"] },
+          programKeahlian: { type: ["string", "null"] },
+          partnerName: { type: ["string", "null"] },
+          requirements: { type: ["string", "null"] },
           publishedAt: time,
           criteria: array(ref("Criterion")),
         },
@@ -189,6 +201,9 @@ export const openapi = {
           status: { enum: statusEnum },
           rubricVersionId: uuid,
           rubricTitle: str,
+          studentId: str,
+          studentName: str,
+          portfolioIncluded: { type: "boolean" },
           originalFilename: str,
           durationMs: { type: "integer" },
           normalizedScore: { type: ["string", "null"] },
@@ -239,6 +254,7 @@ export const openapi = {
         properties: {
           id: uuid,
           assessorId: uuid,
+          assessorName: str,
           feedback: { type: ["string", "null"] },
           finalizedAt: time,
           items: array(ref("ReviewItem")),
@@ -391,12 +407,242 @@ export const openapi = {
         },
       ),
     },
+    "/api/v1/auth/register": {
+      post: operation(
+        "Registrasi siswa lengkap atau permohonan asesor pending",
+        envelope({
+          type: "object",
+          properties: {
+            id: str,
+            accessStatus: { enum: ["ACTIVE", "PENDING"] },
+          },
+        }),
+        {
+          security: [],
+          requestBody: body({
+            oneOf: [
+              {
+                type: "object",
+                required: [
+                  "intent",
+                  "name",
+                  "email",
+                  "password",
+                  "nisn",
+                  "phone",
+                  "schoolName",
+                  "programKeahlian",
+                ],
+                properties: {
+                  intent: { const: "STUDENT" },
+                  name: str,
+                  email: { type: "string", format: "email" },
+                  password: { type: "string", minLength: 8, maxLength: 128 },
+                  nisn: { type: "string", pattern: "^[0-9]{10}$" },
+                  phone: str,
+                  schoolName: str,
+                  programKeahlian: str,
+                },
+              },
+              {
+                type: "object",
+                required: [
+                  "intent",
+                  "name",
+                  "email",
+                  "password",
+                  "employeeId",
+                  "schoolName",
+                  "programKeahlian",
+                ],
+                properties: {
+                  intent: { const: "ASSESSOR" },
+                  name: str,
+                  email: { type: "string", format: "email" },
+                  password: { type: "string", minLength: 8, maxLength: 128 },
+                  employeeId: str,
+                  schoolName: str,
+                  programKeahlian: str,
+                },
+              },
+            ],
+          }),
+        },
+        201,
+      ),
+    },
+    "/api/v1/auth/login": {
+      post: operation(
+        "Masuk dengan email, nomor telepon siswa, atau NIP asesor disetujui",
+        envelope({
+          type: "object",
+          properties: { signedIn: { type: "boolean" } },
+        }),
+        {
+          security: [],
+          requestBody: body({
+            type: "object",
+            required: ["identifier", "password"],
+            properties: { identifier: str, password: str },
+          }),
+        },
+      ),
+    },
+    "/api/v1/assessments/students": {
+      get: operation(
+        "Daftar siswa organisasi dengan pagination dan jumlah pengajuan",
+        {
+          type: "object",
+          properties: {
+            data: array({
+              type: "object",
+              properties: {
+                id: str,
+                name: str,
+                nisn: { type: ["string", "null"] },
+                schoolName: { type: ["string", "null"] },
+                programKeahlian: { type: ["string", "null"] },
+                submissionCount: { type: "integer" },
+              },
+            }),
+            meta: {
+              type: "object",
+              properties: {
+                page: { type: "integer" },
+                limit: { type: "integer" },
+                total: { type: "integer" },
+                programs: array(str),
+              },
+            },
+          },
+        },
+        {
+          parameters: [
+            {
+              name: "group",
+              in: "query",
+              schema: { enum: ["pending", "completed"], default: "pending" },
+            },
+            {
+              name: "q",
+              in: "query",
+              schema: { type: "string", maxLength: 120 },
+            },
+            {
+              name: "program",
+              in: "query",
+              schema: { type: "string", maxLength: 180 },
+            },
+            {
+              name: "page",
+              in: "query",
+              schema: { type: "integer", minimum: 1 },
+            },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
+          ],
+        },
+      ),
+    },
+    "/api/v1/submissions/{id}/portfolio": {
+      post: operation(
+        "Tambahkan hasil selesai milik siswa ke portofolio",
+        envelope({
+          type: "object",
+          properties: { id: uuid, portfolioIncluded: { const: true } },
+        }),
+        { parameters: [idParameter] },
+      ),
+    },
+    "/api/v1/portfolio/share": {
+      get: operation(
+        "Metadata tautan portofolio aktif tanpa token mentah",
+        envelope({
+          type: ["object", "null"],
+          properties: { id: uuid, expiresAt: time },
+        }),
+      ),
+      post: operation(
+        "Buat tautan portofolio; cabut tautan lama secara atomic",
+        envelope({
+          type: "object",
+          properties: {
+            id: uuid,
+            token: str,
+            url: { type: "string", format: "uri" },
+            expiresAt: time,
+          },
+        }),
+        {},
+        201,
+      ),
+      delete: operation(
+        "Jadikan portofolio pribadi dan cabut seluruh tautan",
+        envelope({ type: "object", properties: { revoked: { const: true } } }),
+      ),
+    },
+    "/api/public/portfolios/{token}": {
+      get: operation(
+        "Portofolio publik aktif berisi identitas minimum dan hasil pilihan yang selesai",
+        envelope({
+          type: "object",
+          properties: {
+            student: {
+              type: "object",
+              properties: {
+                name: str,
+                image: { type: ["string", "null"] },
+                schoolName: { type: ["string", "null"] },
+                programKeahlian: { type: ["string", "null"] },
+              },
+            },
+            expiresAt: time,
+            items: array({
+              type: "object",
+              properties: {
+                id: uuid,
+                title: str,
+                description: { type: ["string", "null"] },
+                score: { type: "string" },
+                completedAt: time,
+                feedback: { type: ["string", "null"] },
+              },
+            }),
+          },
+        }),
+        { security: [], parameters: [tokenParameter] },
+      ),
+    },
     "/api/v1/me": {
       get: operation(
         "Pengguna dan profil",
         envelope({
           type: "object",
-          properties: { user: ref("User"), profile: ref("Profile") },
+          properties: {
+            user: ref("User"),
+            profile: ref("Profile"),
+            assessorApplication: {
+              type: ["object", "null"],
+              properties: {
+                id: uuid,
+                status: { enum: ["PENDING", "APPROVED", "REJECTED"] },
+                employeeId: str,
+                institution: str,
+                programKeahlian: str,
+              },
+            },
+            assessorProfile: {
+              type: ["object", "null"],
+              properties: {
+                employeeId: str,
+                institution: str,
+                programKeahlian: str,
+              },
+            },
+          },
         }),
       ),
     },
@@ -441,6 +687,14 @@ export const openapi = {
               additionalProperties: { type: "integer" },
             },
             recent: array(ref("Submission")),
+            statistics: {
+              type: "object",
+              properties: {
+                averageScore: { type: ["string", "null"] },
+                completedThisMonth: { type: "integer" },
+                activeRubrics: { type: "integer" },
+              },
+            },
           },
         }),
       ),
@@ -560,6 +814,18 @@ export const openapi = {
               },
             },
             { name: "status", in: "query", schema: { enum: statusEnum } },
+            { name: "studentId", in: "query", schema: uuid },
+            {
+              name: "group",
+              in: "query",
+              schema: { enum: ["pending", "completed"] },
+            },
+            { name: "period", in: "query", schema: { enum: ["currentMonth"] } },
+            {
+              name: "minScore",
+              in: "query",
+              schema: { type: "number", minimum: 0, maximum: 100 },
+            },
           ],
         },
       ),

@@ -25,40 +25,58 @@ export function SubmissionTable({
       />
     );
   return (
-    <div className="overflow-x-auto rounded-xl border">
+    <div className="overflow-hidden rounded-xl border border-neutral-30 p-2 md:p-6">
       <Table>
-        <TableHeader>
+        <TableHeader className="bg-transparent">
           <TableRow>
-            <TableHead>Video praktik</TableHead>
+            <TableHead>Judul Praktik</TableHead>
+            <TableHead>Tanggal</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Dikirim</TableHead>
-            <TableHead>Skor akhir</TableHead>
+            <TableHead>Skor Akhir</TableHead>
             <TableHead>
               <span className="sr-only">Aksi</span>
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {submissions.map((submission) => (
-            <TableRow key={submission.id}>
-              <TableCell className="max-w-60 truncate font-medium">
-                {submission.rubricTitle || submission.originalFilename}
+          {submissions.map((s) => (
+            <TableRow key={s.id}>
+              <TableCell className="min-w-52 whitespace-normal">
+                <p className="text-s8">{s.rubricTitle || s.originalFilename}</p>
+                <p className="mt-1 text-b9 text-neutral-60">
+                  {base === "/assessor" && s.studentName
+                    ? s.studentName
+                    : s.originalFilename}
+                </p>
+              </TableCell>
+              <TableCell className="text-b9 text-neutral-70">
+                {dateLabel(s.createdAt)}
               </TableCell>
               <TableCell>
-                <StatusBadge status={submission.status} />
+                <StatusBadge status={s.status} />
               </TableCell>
-              <TableCell>{dateLabel(submission.createdAt)}</TableCell>
-              <TableCell>
-                {submission.status === "COMPLETED"
-                  ? `${submission.normalizedScore ?? "—"} / 100`
-                  : "—"}
+              <TableCell
+                className={
+                  s.status === "COMPLETED"
+                    ? "text-s7 text-primary-70"
+                    : "text-b9 text-neutral-50"
+                }
+              >
+                {s.status === "COMPLETED"
+                  ? `${s.normalizedScore ?? "—"}/100`
+                  : "Belum ada skor"}
               </TableCell>
               <TableCell>
                 <LinkButton
-                  href={`${base}/submissions/${submission.id}`}
+                  href={`${base}/submissions/${s.id}`}
                   variant="outline"
+                  className="h-9 min-w-36 border-primary-30 text-s9 md:h-9 md:text-s9"
                 >
-                  Lihat detail
+                  {s.status === "COMPLETED"
+                    ? "Lihat Hasil Penilaian"
+                    : base === "/assessor"
+                      ? "Tinjau"
+                      : "Lihat Status"}
                 </LinkButton>
               </TableCell>
             </TableRow>

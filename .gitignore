@@ -44,3 +44,6 @@ next-env.d.ts
 # Browser test output
 /test-results/
 /playwright-report/
+
+# Isolated local browser test builds
+/.next-e2e-*/

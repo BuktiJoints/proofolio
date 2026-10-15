@@ -1,6 +1,6 @@
-# BuktiPraktik Backend
+# Proofolio / BuktiPraktik
 
-BuktiPraktik adalah backend monolitik Next.js untuk mengumpulkan video praktik siswa,
+Proofolio (BuktiPraktik) adalah aplikasi monolitik Next.js untuk mengumpulkan video praktik siswa,
 mengidentifikasi bukti keterampilan dengan Gemini, memfasilitasi verifikasi asesor, dan
 menerbitkan portofolio keterampilan yang dapat dibagikan.
 
@@ -10,6 +10,9 @@ ditentukan manusia melalui proses review asesor.
 > Kontrak engineering lengkap, keputusan arsitektur, dan aturan untuk coding agent tersedia di
 > [AGENTS.md](./AGENTS.md). README ini adalah panduan penggunaan praktis. Jika perilaku kode tidak
 > sesuai dengan kontrak target, lihat [Known limitations](#known-limitations).
+
+Panduan frontend dan alur UI: [development frontend](docs/frontend-development.md).
+Perubahan alur WBS, persetujuan asesor, dan pengujian desain utama: [panduan WBS](docs/wbs-implementation.md).
 
 ## Daftar Isi
 
@@ -77,7 +80,7 @@ Alur utamanya:
 3. Worker mengirim video privat dan snapshot rubrik ke Gemini.
 4. Evidence tervalidasi disimpan per kriteria; submission menjadi `AWAITING_REVIEW`.
 5. Asesor memverifikasi evidence, memberi skor, dan memfinalisasi penilaian.
-6. Submission `COMPLETED` muncul di portofolio dan dapat dibuatkan tautan publik.
+6. Siswa memilih hasil `COMPLETED` untuk ditambahkan ke portofolio dan dapat membagikan tautan publik.
 
 ### Komponen
 
@@ -547,6 +550,20 @@ curl -fsS \
   "$API_BASE_URL/api/public/evidence/<token-dari-response>"
 ```
 
+## Rubrik demo keterampilan mengajar
+
+`bun run db:seed` juga menyiapkan **Keterampilan Mengajar (Microteaching)** sebagai rubric
+`PUBLISHED` pada default organization. Enam kriteria wajib: membuka pembelajaran (15), tujuan
+pembelajaran (10), penjelasan materi (25), interaksi peserta didik (20), komunikasi/penyajian (15),
+dan menutup pembelajaran (15), total 100 poin. Ini rubric latihan, bukan standar sertifikasi resmi.
+Seed bersifat transactional dan organization-scoped. Pengulangan tidak membuat versi/criterion
+baru atau menimpa revisi/arsip yang sudah dilakukan asesor; original version menjadi identitas seed.
+
+Untuk pengujian nyata, gunakan `FAKE_AI=false`, restart worker, lalu buat pengajuan baru dengan
+rubric microteaching. Rubric dan evidence submission lama tidak berubah ketika rubric baru dibuat.
+Jika video hanya cuplikan, bagian yang tidak terekam tidak boleh dianggap teramati. Lihat panduan
+[frontend development](./docs/frontend-development.md) untuk alur review dan pengujian.
+
 ## Development
 
 Panduan frontend, daftar halaman, dan langkah pengujian lengkap: [Frontend development](./docs/frontend-development.md).
@@ -579,7 +596,7 @@ bun run worker
 | `bun run worker` | Menjalankan analysis worker |
 | `bun run db:generate` | Menghasilkan migration Drizzle dari perubahan schema |
 | `bun run db:migrate` | Menjalankan migration |
-| `bun run db:seed` | Membuat organization, asesor, bucket, dan rubric demo |
+| `bun run db:seed` | Membuat organization, asesor, bucket, serta rubric demo K3 dan microteaching |
 | `bun run lint` | ESLint |
 | `bun run typecheck` | TypeScript tanpa emit |
 | `bun run test` | Vitest sekali jalan |

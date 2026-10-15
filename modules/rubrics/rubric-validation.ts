@@ -3,6 +3,9 @@ export const rubricFormSchema = z
   .object({
     title: z.string().trim().min(2).max(180),
     description: z.string().trim().max(4000).nullable(),
+    programKeahlian: z.string().trim().max(180).nullable().optional(),
+    partnerName: z.string().trim().max(180).nullable().optional(),
+    requirements: z.string().trim().max(4000).nullable().optional(),
     criteria: z
       .array(
         z.object({

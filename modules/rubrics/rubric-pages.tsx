@@ -2,13 +2,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,108 +24,51 @@ import {
   EmptyState,
   LinkButton,
 } from "@/modules/shared/ui";
+import { CatalogPage } from "./catalog-page";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
 import { isUuid } from "@/modules/shared/presentation";
 import type { Role, Envelope, Rubric, Criterion } from "@/modules/shared/types";
 import { RubricEditor } from "./rubric-editor";
 export function CriteriaList({ criteria }: { criteria: Criterion[] }) {
   return (
-    <div className="space-y-3">
-      {criteria.map((criterion) => (
-        <Card key={criterion.id}>
-          <CardHeader>
-            <CardTitle className="text-base">
-              {criterion.order}. {criterion.title}
-            </CardTitle>
-            <CardDescription>
-              {criterion.code} · Maksimal {criterion.maxScore} poin ·{" "}
-              {criterion.required ? "Wajib" : "Opsional"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm whitespace-pre-wrap">
-            {criterion.description}
-          </CardContent>
-        </Card>
+    <Accordion>
+      {criteria.map((c) => (
+        <AccordionItem key={c.id} value={c.id}>
+          <AccordionTrigger className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4">
+            <span className="min-w-0">
+              {c.order}. {c.title}
+            </span>
+            <span
+              data-testid="criterion-points"
+              className="shrink-0 text-right text-b9 tabular-nums"
+            >
+              {c.maxScore} poin
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <p className="whitespace-pre-wrap">{c.description}</p>
+            <p className="mt-3 text-b9">
+              {c.required ? "Kriteria wajib" : "Kriteria opsional"}
+            </p>
+          </AccordionContent>
+        </AccordionItem>
       ))}
-    </div>
+    </Accordion>
   );
 }
 export function RubricsPage({ role }: { role: Role }) {
-  const query = useQuery({
-    queryKey: ["rubrics", role],
-    queryFn: () => api<Envelope<Rubric[]>>("/api/v1/rubrics"),
-  });
-  if (query.isPending) return <LoadingState />;
-  if (query.error)
-    return (
-      <ErrorState error={query.error} retry={() => void query.refetch()} />
-    );
-  const base = role === "STUDENT" ? "/student" : "/assessor";
-  return (
-    <>
-      <PageHeading
-        title="Rubrik kompetensi"
-        description={
-          role === "STUDENT"
-            ? "Pelajari kriteria penilaian sebelum merekam praktik."
-            : "Buat dan verifikasi rubrik sebelum menerbitkannya."
-        }
-        action={
-          role === "ASSESSOR" && (
-            <LinkButton href="/assessor/rubrics/new">Buat rubrik</LinkButton>
-          )
-        }
-      />
-      {!query.data.data.length ? (
-        <EmptyState
-          title="Belum ada rubrik"
-          description={
-            role === "STUDENT"
-              ? "Rubrik akan tersedia setelah asesor menerbitkannya."
-              : "Buat rubrik manual atau ekstrak dari PDF."
-          }
-        />
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {query.data.data.map((rubric) => (
-            <Card key={rubric.id}>
-              <CardHeader>
-                <div>
-                  <Badge variant="secondary">
-                    {
-                      {
-                        DRAFT: "Draft",
-                        PUBLISHED: "Terbit",
-                        ARCHIVED: "Diarsipkan",
-                      }[rubric.status]
-                    }
-                  </Badge>
-                </div>
-                <CardTitle>{rubric.title}</CardTitle>
-                <CardDescription>
-                  {rubric.partner?.name ? `Mitra: ${rubric.partner.name} · ` : ""}
-                  {rubric.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <LinkButton
-                  href={`${base}/rubrics/${rubric.id}`}
-                  variant="outline"
-                >
-                  Lihat rubrik
-                </LinkButton>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </>
-  );
+  return <CatalogPage role={role} />;
 }
 export function NewRubricPage() {
   return (
     <>
       <PageHeading
-        title="Buat rubrik"
+        title="Tambah Modul UKK"
         description="Isi manual atau gunakan calon draft dari PDF, lalu tinjau setiap kriteria."
       />
       <RubricEditor />
@@ -170,6 +107,12 @@ export function RubricDetailPage({ id, role }: { id: string; role: Role }) {
       : rubric.versions?.at(-1);
   return (
     <>
+      <LinkButton
+        href={role === "STUDENT" ? "/student/rubrics" : "/assessor/rubrics"}
+        variant="neutral"
+      >
+        ← Kembali ke Manajemen Modul
+      </LinkButton>
       <PageHeading
         title={rubric.title}
         description={rubric.description ?? undefined}
@@ -236,7 +179,7 @@ export function RubricDetailPage({ id, role }: { id: string; role: Role }) {
           <LinkButton
             href={`/student/submissions/new?rubricVersionId=${rubric.activeVersionId}`}
           >
-            Ajukan video dengan rubrik ini
+            Pilih Modul & Unggah Video Praktik
           </LinkButton>
         )}
       </div>
@@ -257,11 +200,55 @@ export function RubricDetailPage({ id, role }: { id: string; role: Role }) {
             initial={{
               title: version.title,
               description: version.description,
+              programKeahlian: version.programKeahlian,
+              partnerName: version.partnerName,
+              requirements: version.requirements,
               criteria: version.criteria,
             }}
           />
         ) : (
-          <CriteriaList criteria={version.criteria} />
+          <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+            <section className="space-y-5">
+              <h2 className="text-h5">Rubrik Kompetensi</h2>
+              <p className="text-b8 text-neutral-70">
+                Pelajari indikator bukti keterampilan yang akan diverifikasi
+                asesor.
+              </p>
+              <CriteriaList criteria={version.criteria} />
+            </section>
+            <Card className="self-start">
+              <CardHeader>
+                <CardTitle className="text-s6">Informasi Modul UKK</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-b8">
+                  {version.partnerName ||
+                    rubric.partner?.name ||
+                    "Mitra sekolah"}
+                </p>
+                <p className="text-b8 text-neutral-70">
+                  {version.programKeahlian || "Program keahlian umum"}
+                </p>
+                <p className="text-s8">
+                  {version.criteria.length} kriteria ·{" "}
+                  {version.criteria.reduce((s, c) => s + c.maxScore, 0)} poin
+                </p>
+                {version.requirements && (
+                  <p className="whitespace-pre-wrap text-b8">
+                    {version.requirements}
+                  </p>
+                )}
+                {role === "STUDENT" && rubric.activeVersionId && (
+                  <LinkButton
+                    href={`/student/submissions/new?rubricVersionId=${rubric.activeVersionId}`}
+                    className="w-full whitespace-normal"
+                  >
+                    Unggah Video Praktik
+                  </LinkButton>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )
       ) : (
         <EmptyState title="Versi rubrik belum tersedia" />

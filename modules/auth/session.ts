@@ -12,6 +12,10 @@ export function useMe() {
 }
 export const homeForRole = (role: Role) =>
   role === "ASSESSOR" ? "/assessor/dashboard" : "/student/dashboard";
+export const homeForMe = (me: Me) =>
+  me.user.accessStatus && me.user.accessStatus !== "ACTIVE"
+    ? "/assessor/pending"
+    : homeForRole(me.user.role);
 export const profileComplete = (me: Me) =>
   !!me.profile?.schoolName &&
   !!me.profile?.programKeahlian &&

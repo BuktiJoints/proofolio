@@ -4,11 +4,24 @@ export type User = {
   name: string;
   email: string;
   role: Role;
+  accessStatus?: "ACTIVE" | "PENDING" | "REJECTED";
   organizationId: string;
   image: string | null;
 };
 export type Me = {
   user: User;
+  assessorApplication?: {
+    id: string;
+    status: string;
+    employeeId: string;
+    institution: string;
+    programKeahlian: string;
+  } | null;
+  assessorProfile?: {
+    employeeId: string;
+    institution: string;
+    programKeahlian: string;
+  } | null;
   profile: {
     nisn: string | null;
     phone: string | null;
@@ -29,6 +42,9 @@ export type SubmissionStatus =
   | "IN_REVIEW"
   | "COMPLETED";
 export type Submission = {
+  studentId?: string;
+  studentName?: string;
+  portfolioIncluded?: boolean;
   id: string;
   status: SubmissionStatus;
   rubricVersionId: string;
@@ -49,11 +65,17 @@ export type CriterionInput = {
 };
 export type Criterion = CriterionInput & { id: string };
 export type RubricInput = {
+  programKeahlian?: string | null;
+  partnerName?: string | null;
+  requirements?: string | null;
   title: string;
   description: string | null;
   criteria: CriterionInput[];
 };
 export type RubricVersion = {
+  programKeahlian?: string | null;
+  partnerName?: string | null;
+  requirements?: string | null;
   id: string;
   version: number;
   title: string;
@@ -62,6 +84,11 @@ export type RubricVersion = {
   criteria: Criterion[];
 };
 export type Rubric = {
+  programKeahlian?: string | null;
+  partnerName?: string | null;
+  requirements?: string | null;
+  criterionCount?: number;
+  followed?: boolean;
   id: string;
   title: string;
   description: string | null;
@@ -78,6 +105,7 @@ export type ReviewItem = {
   note?: string | null;
 };
 export type Review = {
+  assessorName?: string | null;
   id: string;
   assessorId: string;
   feedback: string | null;
@@ -93,6 +121,12 @@ export type Evidence = {
   quality: string;
 };
 export type SubmissionDetail = Submission & {
+  student?: {
+    name: string;
+    nisn: string | null;
+    schoolName: string | null;
+    programKeahlian: string | null;
+  } | null;
   rubricVersion: RubricVersion;
   criteria: Criterion[];
   analysis: { evidence: Evidence[] } | null;

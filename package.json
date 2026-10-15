@@ -7,7 +7,8 @@
     "build": "node node_modules/next/dist/bin/next build --webpack",
     "start": "node node_modules/next/dist/bin/next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typegen": "node node_modules/next/dist/bin/next typegen",
+    "typecheck": "bun run typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
@@ -15,11 +16,15 @@
     "db:seed": "bun scripts/seed.ts",
     "worker": "bun server/worker/index.ts",
     "test:e2e": "playwright test",
-    "test:api": "playwright test tests/e2e/api-contract.spec.ts"
+    "test:api": "playwright test tests/e2e/api-contract.spec.ts",
+    "assessor:review": "bun scripts/review-assessor.ts",
+    "test:local": "bun scripts/test-local.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.901.0",
     "@base-ui/react": "^1.9.0",
+    "@fontsource-variable/sora": "^5.3.0",
+    "@fontsource/poppins": "^5.3.0",
     "@google/genai": "^1.27.0",
     "@tanstack/react-query": "^5.104.2",
     "@tanstack/react-query-devtools": "^5.104.2",
@@ -44,7 +49,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
-    "@tailwindcss/turbopack": "^4",
+    "@tailwindcss/postcss": "^4.3.3",
     "@tanstack/eslint-plugin-query": "^5.104.2",
     "@types/busboy": "^1.5.4",
     "@types/node": "^20",
