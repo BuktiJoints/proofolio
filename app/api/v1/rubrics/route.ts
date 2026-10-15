@@ -1,7 +1,12 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { currentUser } from "@/server/auth";
 import { db } from "@/server/db";
-import { organizations, rubrics, rubricVersions, rubricCriteria } from "@/server/db/schema";
+import {
+  organizations,
+  rubrics,
+  rubricVersions,
+  rubricCriteria,
+} from "@/server/db/schema";
 import { rubricInput } from "@/server/domain/rubrics";
 import { ok, route } from "@/server/http";
 
@@ -22,6 +27,11 @@ export const GET = () =>
           organizationId: rubrics.organizationId,
           title: rubrics.title,
           description: rubrics.description,
+          programKeahlian: rubrics.programKeahlian,
+          partnerName: rubrics.partnerName,
+          requirements: rubrics.requirements,
+          followed: sql<boolean>`exists(select 1 from submissions s join rubric_versions v on v.id=s.rubric_version_id where v.rubric_id=${rubrics.id} and s.student_id=${user.id} and s.organization_id=${user.organizationId})`,
+          criterionCount: sql<number>`(select count(*)::int from rubric_criteria where rubric_version_id = coalesce(${rubrics.activeVersionId}, (select id from rubric_versions where rubric_id = ${rubrics.id} order by version desc limit 1)))`,
           status: rubrics.status,
           activeVersionId: rubrics.activeVersionId,
           createdBy: rubrics.createdBy,
@@ -46,6 +56,9 @@ export const POST = (request: Request) =>
           organizationId: user.organizationId,
           title: body.title,
           description: body.description,
+          programKeahlian: body.programKeahlian,
+          partnerName: body.partnerName,
+          requirements: body.requirements,
           createdBy: user.id,
         })
         .returning();
@@ -56,17 +69,18 @@ export const POST = (request: Request) =>
           version: 1,
           title: body.title,
           description: body.description,
+          programKeahlian: body.programKeahlian,
+          partnerName: body.partnerName,
+          requirements: body.requirements,
           createdBy: user.id,
         })
         .returning();
-      await tx
-        .insert(rubricCriteria)
-        .values(
-          body.criteria.map((criterion) => ({
-            ...criterion,
-            rubricVersionId: version.id,
-          })),
-        );
+      await tx.insert(rubricCriteria).values(
+        body.criteria.map((criterion) => ({
+          ...criterion,
+          rubricVersionId: version.id,
+        })),
+      );
       return { ...created, version };
     });
     return ok(rubric, { status: 201 });

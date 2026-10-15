@@ -51,6 +51,9 @@ export const PUT = (
         .set({
           title: body.title,
           description: body.description,
+          programKeahlian: body.programKeahlian,
+          partnerName: body.partnerName,
+          requirements: body.requirements,
           updatedAt: new Date(),
         })
         .where(eq(rubrics.id, id));
@@ -59,6 +62,9 @@ export const PUT = (
         .set({
           title: body.title,
           description: body.description,
+          programKeahlian: body.programKeahlian,
+          partnerName: body.partnerName,
+          requirements: body.requirements,
           updatedAt: new Date(),
         })
         .where(eq(rubricVersions.id, version.id));

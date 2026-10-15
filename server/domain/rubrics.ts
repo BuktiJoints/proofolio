@@ -16,6 +16,9 @@ export const rubricInput = z
   .object({
     title: z.string().trim().min(2).max(180),
     description: z.string().trim().max(4000).nullable().optional(),
+    programKeahlian: z.string().trim().min(2).max(180).nullable().optional(),
+    partnerName: z.string().trim().min(2).max(180).nullable().optional(),
+    requirements: z.string().trim().max(4000).nullable().optional(),
     criteria: z.array(criterionInput).min(1).max(30),
   })
   .superRefine((v, ctx) => {
@@ -87,6 +90,9 @@ export async function createVersion(
       source = rubricInput.parse({
         title: previous.title,
         description: previous.description,
+        programKeahlian: previous.programKeahlian,
+        partnerName: previous.partnerName,
+        requirements: previous.requirements,
         criteria,
       });
     }
@@ -97,6 +103,9 @@ export async function createVersion(
         version: (current.n ?? 0) + 1,
         title: source.title,
         description: source.description,
+        programKeahlian: source.programKeahlian,
+        partnerName: source.partnerName,
+        requirements: source.requirements,
         createdBy: userId,
       })
       .returning();
@@ -118,6 +127,9 @@ export async function createVersion(
         activeVersionId: null,
         title: source.title,
         description: source.description,
+        programKeahlian: source.programKeahlian,
+        partnerName: source.partnerName,
+        requirements: source.requirements,
         updatedAt: new Date(),
       })
       .where(eq(rubrics.id, rubricId));

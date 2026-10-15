@@ -686,3 +686,47 @@ test selesai.
    berupa URL eksternal; managed image upload berada di luar scope MVP.
 3. Dashboard menampilkan tahap dan timestamp aktual tanpa ETA. Estimasi durasi belum diberikan karena
    belum ada telemetry historis yang cukup untuk menghasilkan prediksi yang dapat dipercaya.
+
+## 10. WBS Web dan keputusan akses (15 Oktober 2026)
+
+- Pendaftaran asesor adalah permohonan, bukan pemberian role langsung.
+  `POST /api/v1/auth/register` menerima `intent: STUDENT | ASSESSOR`, nama, email,
+  password, sekolah/instansi, dan program keahlian. Siswa wajib NISN 10 digit
+  dan phone; asesor wajib employeeId. Success 201 dan cookie Better Auth.
+- Siswa didaftarkan dengan profil lengkap. Permohonan asesor membuat user
+  ber-role STUDENT tetapi `accessStatus=PENDING`, tanpa akses endpoint produk
+  selain `/api/v1/me`. Client tidak dapat mengatur accessStatus atau role.
+  Kegagalan penyimpanan profil/permohonan mengompensasi akun baru tersebut.
+- `/api/v1/me` additive: user.accessStatus, assessorApplication dan assessorProfile.
+  `currentUser()` membaca status terbaru dari DB; status non-ACTIVE menghasilkan
+  403 ASSESSOR_APPROVAL_PENDING / ASSESSOR_APPLICATION_REJECTED.
+- Administrator yang memiliki akses operasional database meninjau melalui
+  `bun run assessor:review`. Tidak ada endpoint HTTP publik untuk promosi role.
+  Persetujuan membutuhkan organizationId dan identitas reviewer, memakai row
+  lock, idempotent untuk keputusan yang sama, dan menyimpan waktu/reviewer.
+- `POST /api/v1/auth/login` menerima identifier dan password; identifier berupa
+  email, nomor telepon siswa unik secara lookup, atau employeeId asesor yang
+  sudah disetujui. Password dan cookie tetap dikelola Better Auth; pesan gagal
+  tidak mengungkap apakah identifier terdaftar.
+- Rubric input dan version snapshot additive: programKeahlian, partnerName,
+  requirements (opsional). Metadata historis ikut immutable setelah publish.
+  List rubric menyertakan criterionCount dan followed untuk siswa bersangkutan.
+- Dashboard additive statistics: averageScore dari seluruh hasil selesai pada
+  scope pengguna, completedThisMonth, activeRubrics. Tidak ada angka ETA buatan.
+- `GET /api/v1/assessments/students` hanya ASSESSOR, organization-scoped,
+  pagination 1..100, group pending/completed, q (nama/NISN), dan program.
+  List submission menerima studentId UUID, group pending/completed,
+  period=currentMonth dan minScore 0..100, tetap ownership/tenant-scoped.
+- Submission baru belum masuk portofolio sampai siswa memanggil
+  `POST /api/v1/submissions/:id/portfolio`; hanya hasil COMPLETED miliknya,
+  idempotent. Migration mempertahankan hasil portofolio lama.
+- `GET/POST/DELETE /api/v1/portfolio/share`: metadata aktif tanpa token; create
+  token random 256-bit yang menggantikan tautan lama; revoke idempotent.
+  Database hanya menyimpan SHA-256, expiry memakai SHARE_TTL_HOURS.
+- `GET /api/public/portfolios/:token` hanya tautan aktif/belum expired;
+  mengembalikan nama, sekolah, jurusan, foto dan hasil pilihan COMPLETED beserta
+  feedback final. Tidak mengekspos NISN, email, phone, session atau draft.
+- PDF memakai fasilitas cetak/simpan PDF browser dengan print stylesheet.
+  Dukungan dokumen rubrik tetap PDF 10 MiB; DOC belum tersedia.
+- Revisi nilai final menunggu keputusan produk; COMPLETED tetap terminal dan
+  tidak dapat diubah. Tidak ada ambang kelulusan otomatis/badge lulus buatan.

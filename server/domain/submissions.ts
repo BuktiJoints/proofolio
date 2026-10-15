@@ -9,6 +9,8 @@ import {
   rubricCriteria,
   rubricVersions,
   submissions,
+  users,
+  studentProfiles,
 } from "@/server/db/schema";
 import { ApiError } from "@/server/http";
 
@@ -77,14 +79,43 @@ export async function submissionDetail(id: string, user: CurrentUser) {
           evidence,
         }
     : null;
+  const [student] = await db
+    .select({
+      name: users.name,
+      nisn: studentProfiles.nisn,
+      schoolName: studentProfiles.schoolName,
+      programKeahlian: studentProfiles.programKeahlian,
+    })
+    .from(users)
+    .leftJoin(studentProfiles, eq(studentProfiles.userId, users.id))
+    .where(
+      and(
+        eq(users.id, submission.studentId),
+        eq(users.organizationId, user.organizationId),
+      ),
+    )
+    .limit(1);
+  const [assessor] = review
+    ? await db
+        .select({ name: users.name })
+        .from(users)
+        .where(
+          and(
+            eq(users.id, review.assessorId),
+            eq(users.organizationId, user.organizationId),
+          ),
+        )
+        .limit(1)
+    : [];
   return {
     ...submission,
+    student: student ?? null,
     rubricVersion: version,
     criteria,
     analysis,
     review:
       review && (user.role === "ASSESSOR" || submission.status === "COMPLETED")
-        ? { ...review, items }
+        ? { ...review, items, assessorName: assessor?.name ?? null }
         : null,
   };
 }
