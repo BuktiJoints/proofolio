@@ -5,6 +5,16 @@ import {
 import { Pool } from "pg";
 import { randomUUID } from "node:crypto";
 export const baseURL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
+const signupTimes: number[] = [];
+async function respectCredentialRateLimit() {
+  const cutoff = Date.now() - 10_100;
+  while (signupTimes.length && signupTimes[0] <= cutoff) signupTimes.shift();
+  if (signupTimes.length >= 3) {
+    await new Promise((resolve) => setTimeout(resolve, signupTimes[0] + 10_100 - Date.now()));
+    return respectCredentialRateLimit();
+  }
+  signupTimes.push(Date.now());
+}
 export async function actors() {
   if (!process.env.DATABASE_URL || process.env.FAKE_AI !== "true")
     throw new Error(
@@ -41,9 +51,17 @@ export async function actors() {
     const email = `${label}-${run}@example.test`;
     const context = await playwrightRequest.newContext({ baseURL });
     contexts.push(context);
-    const response = await context.post("/api/auth/sign-up/email", {
+    await respectCredentialRateLimit();
+    let response = await context.post("/api/auth/sign-up/email", {
       data: { name: `Test ${label}`, email, password },
     });
+    if (response.status() === 429) {
+      const retryAfter = Number(response.headers()["retry-after"] ?? 10);
+      await new Promise((resolve) => setTimeout(resolve, Math.max(retryAfter * 1000, 10_100)));
+      response = await context.post("/api/auth/sign-up/email", {
+        data: { name: `Test ${label}`, email, password },
+      });
+    }
     if (!response.ok())
       throw new Error(`Test signup failed (${response.status()})`);
     const payload = await response.json();

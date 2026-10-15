@@ -204,7 +204,8 @@ Auth. Jangan menduplikasi password hashing atau session management di route prod
 
 - Role: authenticated `STUDENT` atau `ASSESSOR`.
 - Success `200`: `{ data: { user, profile } }`.
-- `profile` dapat `null`; student profile berisi `schoolName` dan `programKeahlian`.
+- `profile` dapat `null`; student profile berisi `nisn`, `phone`, `schoolName`,
+  `programKeahlian`, dan `notificationStatusEnabled`. `user.image` menyimpan URL foto profil.
 
 #### `PATCH /api/v1/me/profile`
 
@@ -214,14 +215,22 @@ Auth. Jangan menduplikasi password hashing atau session management di route prod
 ```json
 {
   "name": "Nama Lengkap",
+  "nisn": "1234567890",
+  "phone": "+6281234567890",
   "schoolName": "Nama Sekolah",
-  "programKeahlian": "Program Keahlian"
+  "programKeahlian": "Program Keahlian",
+  "image": "https://example.com/foto.jpg",
+  "notificationStatusEnabled": true
 }
 ```
 
-- Semua field wajib, di-trim, dan minimal 2 karakter.
+- `name`, `schoolName`, dan `programKeahlian` tetap wajib agar payload client lama kompatibel.
+  Field lain additive. NISN bila dikirim wajib 10 digit dan unik; nomor telepon dinormalisasi ke
+  format `+62`; image adalah URL atau null.
 - Success `200`: profile yang telah tersimpan.
 - Update nama user dan student profile harus atomic.
+- Upload mensyaratkan NISN, nomor telepon, sekolah, dan program keahlian lengkap. Error
+  `PROFILE_INCOMPLETE` menyertakan `fields.missing`.
 
 ### 4.3 Dashboard
 
@@ -258,7 +267,8 @@ Dalam satu version, `code` dan `order` harus unik. `maxScore` adalah integer `1.
 - Role: authenticated.
 - `STUDENT`: hanya rubric `PUBLISHED` dalam organization-nya.
 - `ASSESSOR`: semua rubric dalam organization-nya.
-- Success `200`: list rubric; `activeVersionId` menunjukkan version yang dapat dipakai upload.
+- Success `200`: list rubric; `activeVersionId` menunjukkan version yang dapat dipakai upload dan
+  `partner` berisi id/nama organization pemilik sebagai mitra UKK.
 
 #### `POST /api/v1/rubrics`
 
@@ -669,17 +679,10 @@ Bagian ini mendeskripsikan ketidaksesuaian kode saat dokumen dibuat. Ini bukan c
 dipertahankan. Hapus item hanya setelah implementation, migration bila perlu, OpenAPI, dan regression
 test selesai.
 
-1. Worker masih menulis status langsung, belum memakai domain transition service seperti route
-   review dan retry. Transisi retry otomatis worker belum konsisten dengan transition matrix.
-2. Worker hanya mengambil `PENDING`/`RETRY_SCHEDULED`; abandoned `RUNNING` job tidak direclaim.
-3. Gemini polling/generation untuk analisis video belum mempunyai timeout. Ekstraksi PDF memiliki
-   timeout dan abort terpisah.
-4. AI evidence video belum mewajibkan pasangan timestamp; duplicate/unknown evidence belum
-   dinormalisasi secara menyeluruh.
-5. Default `GEMINI_MODEL` belum konsisten antara env schema, local Compose, production Compose,
-   dan `.env.example`.
-6. Repository belum memiliki workflow GitHub Actions yang menerbitkan image production ke GHCR.
-7. Audit event worker belum mencakup seluruh state change minimum, termasuk `ANALYSIS_STARTED`.
-8. Unit tests serta API/browser integration dengan PostgreSQL dan concurrency tersedia. Coverage
-   worker permanent failure, crash recovery, duplicate workers, migration database kosong,
-   production startup ordering dan target NFR masih perlu dilengkapi.
+1. Unit tests serta API/browser integration dengan PostgreSQL dan concurrency tersedia. Coverage
+   worker permanent failure, crash recovery, duplicate workers, production startup ordering dan
+   target NFR masih perlu dilengkapi. Migration database kosong dijalankan oleh CI.
+2. Preferensi notifikasi status baru dipersist, belum ada channel pengiriman email/push. Foto profil
+   berupa URL eksternal; managed image upload berada di luar scope MVP.
+3. Dashboard menampilkan tahap dan timestamp aktual tanpa ETA. Estimasi durasi belum diberikan karena
+   belum ada telemetry historis yang cukup untuk menghasilkan prediksi yang dapat dipercaya.
