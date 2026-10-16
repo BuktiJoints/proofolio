@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { DesignIcon } from "./design-icon";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -169,5 +170,23 @@ export function Choice({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+export function BackLink({
+  href,
+  children = "Kembali ke Manajemen Modul",
+}: {
+  href: string;
+  children?: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex w-fit items-center gap-2 text-s8 text-primary-70 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <DesignIcon name="back" />
+      {children}
+    </Link>
   );
 }

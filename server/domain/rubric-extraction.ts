@@ -61,6 +61,38 @@ export async function extractRubricDraft(
     };
   } catch (error) {
     if (error instanceof ApiError) throw error;
+    const status =
+      typeof error === "object" && error !== null && "status" in error
+        ? Number(error.status)
+        : undefined;
+    if (status === 429 || status === 503)
+      throw new ApiError(
+        503,
+        "RUBRIC_EXTRACTION_BUSY",
+        "Layanan AI sedang sibuk atau kuotanya terbatas. Tunggu beberapa saat, lalu coba lagi. Isian Anda tetap ada di editor.",
+      );
+    if (status === 401 || status === 403 || status === 404)
+      throw new ApiError(
+        503,
+        "RUBRIC_EXTRACTION_UNAVAILABLE",
+        "Layanan ekstraksi AI belum tersedia. Minta pengelola memeriksa konfigurasi model dan akses API.",
+      );
+    if (
+      controller.signal.aborted ||
+      (error instanceof Error &&
+        ["AbortError", "TimeoutError"].includes(error.name))
+    )
+      throw new ApiError(
+        503,
+        "RUBRIC_EXTRACTION_TIMEOUT",
+        "Ekstraksi terlalu lama. Coba lagi atau isi rubrik secara manual.",
+      );
+    if (error instanceof SyntaxError)
+      throw new ApiError(
+        503,
+        "RUBRIC_EXTRACTION_INVALID",
+        "Hasil AI belum dapat dibaca. Coba lagi atau isi rubrik secara manual.",
+      );
     throw new ApiError(
       503,
       "RUBRIC_EXTRACTION_FAILED",

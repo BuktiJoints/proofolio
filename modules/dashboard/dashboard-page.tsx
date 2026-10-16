@@ -1,4 +1,6 @@
 "use client";
+import { Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -63,9 +65,27 @@ export function DashboardPage({ role }: { role: Role }) {
       ];
   return (
     <>
-      <section className="flex flex-col justify-between gap-6 rounded-2xl bg-primary-70 p-6 text-neutral-10 md:min-h-46 md:flex-row md:items-center md:p-10">
+      <section
+        className={cn(
+          "relative isolate flex flex-col justify-between gap-6 overflow-hidden rounded-2xl p-6 text-neutral-10 md:min-h-46 md:flex-row md:items-center md:p-10",
+          student ? "bg-primary-90" : "bg-primary-90",
+        )}
+      >
+        <span
+          aria-hidden="true"
+          data-testid="dashboard-banner-decoration"
+          className={cn(
+            "pointer-events-none absolute -top-14 -right-14 -z-10 size-64 rounded-full border-[32px]",
+            student ? "border-primary-80" : "border-primary-80",
+          )}
+        />
         <div className="min-w-0 flex-1 space-y-5">
-          <h1 className="break-words text-h4 md:text-h2">
+          <h1
+            className={cn(
+              "break-words text-h4",
+              student ? "md:text-h2" : "md:text-h3",
+            )}
+          >
             {student ? "Halo, " : "Selamat datang, "}
             {me.data?.user.name}
             {student ? "!" : ""}
@@ -83,7 +103,6 @@ export function DashboardPage({ role }: { role: Role }) {
                   me.data?.assessorProfile?.employeeId
                     ? `NIP ${me.data.assessorProfile.employeeId}`
                     : "Asesor",
-                  me.data?.assessorProfile?.institution,
                   me.data?.assessorProfile?.programKeahlian,
                 ]
             )
@@ -91,7 +110,12 @@ export function DashboardPage({ role }: { role: Role }) {
               .map((label) => (
                 <Badge
                   key={label}
-                  className="border-0 bg-primary-20 text-b9 text-primary-70"
+                  className={cn(
+                    "border-0 text-b9",
+                    student
+                      ? "bg-primary-20 text-primary-70"
+                      : "bg-primary-80 text-primary-20",
+                  )}
                 >
                   {label}
                 </Badge>
@@ -102,7 +126,8 @@ export function DashboardPage({ role }: { role: Role }) {
           href={student ? "/student/rubrics" : "/assessor/submissions"}
           variant="neutral"
         >
-          {student ? "+ Unggah Video Praktik" : "Masuk Penilaian Siswa"}
+          <Plus className="size-4" />
+          {student ? "Unggah Video Praktik" : "Masuk Penilaian Siswa"}
         </LinkButton>
       </section>
       {student && me.data && !profileComplete(me.data) && (

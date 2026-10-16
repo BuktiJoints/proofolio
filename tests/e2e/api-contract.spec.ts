@@ -69,7 +69,7 @@ test("API boundaries, extraction, immutable versions, scoring and concurrency on
         {
           code: "REQ",
           title: "Prosedur aman",
-          description: "Langkah praktik aman",
+          description: "Langkah praktik aman. ".repeat(120),
           order: 1,
           required: true,
           maxScore: 80,

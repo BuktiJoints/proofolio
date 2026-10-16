@@ -2,12 +2,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { PrintButton } from "@/modules/shared/print-button";
+import { DesignIcon } from "@/modules/shared/design-icon";
 import { ErrorState } from "@/modules/shared/ui";
 import { api } from "@/lib/api-client";
 import { dateLabel } from "@/modules/shared/presentation";
@@ -36,71 +37,88 @@ export function PortfolioSharing() {
     },
   });
   return (
-    <Card className="print:hidden">
-      <CardHeader>
-        <CardTitle className="text-h6">Aksesibilitas</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="flex items-center justify-between gap-4">
-          <Label htmlFor="portfolio-public">
-            {query.data?.data ? "Publik" : "Pribadi"}
-          </Label>
-          <Switch
-            id="portfolio-public"
-            checked={!!query.data?.data}
-            onCheckedChange={(checked) => change.mutate(checked)}
-            disabled={query.isPending || change.isPending || !!query.error}
-          />
-        </div>
-        <p className="text-b9 text-neutral-70">
-          Siapa pun dengan tautan aktif dapat melihat nama, sekolah, jurusan,
-          dan hasil yang kamu tambahkan ke portofolio.
-        </p>
-        {query.data?.data && (
-          <>
-            <p className="text-b9 text-neutral-70">
-              Berlaku sampai {dateLabel(query.data.data.expiresAt)}.
+    <section className="space-y-5 print:hidden">
+      <h2 className="text-h5">Aksesibilitas</h2>
+      <Card className="rounded-xl">
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-3 rounded-xl bg-primary-10 p-4">
+            <DesignIcon name="public-globe" />
+            <div className="min-w-0 flex-1">
+              <Label
+                htmlFor="portfolio-public"
+                className="text-s8 text-neutral-90"
+              >
+                {query.data?.data ? "Publik" : "Pribadi"}
+              </Label>
+              <p className="text-b10 text-neutral-60">
+                {query.data?.data
+                  ? "Siapa pun dengan link dapat melihat"
+                  : "Hanya kamu yang dapat melihat"}
+              </p>
+            </div>
+            <Switch
+              id="portfolio-public"
+              checked={!!query.data?.data}
+              onCheckedChange={(checked) => change.mutate(checked)}
+              disabled={query.isPending || change.isPending || !!query.error}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="portfolio-url" className="text-s9">
+              Link unik portofolio
+            </Label>
+            <Input
+              id="portfolio-url"
+              readOnly
+              value={url}
+              placeholder={
+                query.data?.data
+                  ? "Buat tautan baru untuk menyalin link"
+                  : "Aktifkan Publik untuk membuat link"
+              }
+            />
+          </div>
+          {query.data?.data && (
+            <p className="text-b10 text-neutral-60">
+              Berlaku sampai {dateLabel(query.data.data.expiresAt)}. Tautan
+              hanya ditampilkan saat dibuat.
             </p>
-            {url ? (
-              <>
-                <Label htmlFor="portfolio-url">Link unik portofolio</Label>
-                <Input id="portfolio-url" readOnly value={url} />
-                <Button
-                  className="w-full text-s8 md:text-s8"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(url);
-                      toast.success("Tautan disalin");
-                    } catch {
-                      toast.error("Salin tautan dari kolom di atas.");
-                    }
-                  }}
-                >
-                  Salin Link Portofolio
-                </Button>
-              </>
-            ) : (
-              <>
-                <p className="text-b9 text-neutral-70">
-                  Tautan hanya ditampilkan saat dibuat. Membuat ulang akan
-                  menonaktifkan tautan sebelumnya.
-                </p>
-                <Button
-                  className="w-full"
-                  disabled={change.isPending}
-                  onClick={() => change.mutate(true)}
-                >
-                  Buat tautan baru
-                </Button>
-              </>
-            )}
-          </>
-        )}
-        {(query.error || change.error) && (
-          <ErrorState error={query.error ?? change.error} />
-        )}
-        <PrintButton label="Unduh Portofolio (PDF)" />
-      </CardContent>
-    </Card>
+          )}
+          {query.data?.data && !url ? (
+            <Button
+              className="w-full text-s8 md:text-s8"
+              disabled={change.isPending}
+              onClick={() => change.mutate(true)}
+            >
+              Buat tautan baru
+            </Button>
+          ) : (
+            <Button
+              className="w-full text-s8 md:text-s8"
+              disabled={!url}
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(url);
+                  toast.success("Tautan disalin");
+                } catch {
+                  toast.error("Salin tautan dari kolom di atas.");
+                }
+              }}
+            >
+              <DesignIcon name="copy-white" />
+              Salin Link Portofolio
+            </Button>
+          )}
+          <PrintButton
+            label="Unduh Portofolio"
+            variant="neutral"
+            className="w-full text-s8 md:text-s8"
+          />
+          {(query.error || change.error) && (
+            <ErrorState error={query.error ?? change.error} />
+          )}
+        </CardContent>
+      </Card>
+    </section>
   );
 }

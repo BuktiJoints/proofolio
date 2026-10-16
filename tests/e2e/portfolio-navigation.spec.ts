@@ -57,16 +57,13 @@ for (const populated of [false, true]) {
       route.fulfill({ json: { data: null } }),
     );
     await page.goto("/student/profile");
-    await expect(
-      page.getByText(
-        `${populated ? 1 : 0} video terverifikasi di portofolio.`,
-        { exact: true },
-      ),
-    ).toBeVisible();
+    await expect(page.getByTestId("profile-video-count")).toHaveText(
+      populated ? "1" : "0",
+    );
     for (let visit = 0; visit < 2; visit++) {
       await page
         .getByRole("link", {
-          name: "Lihat dan bagikan portofolio",
+          name: "Buka Portofolio Digital",
           exact: true,
         })
         .click();
@@ -90,12 +87,7 @@ for (const populated of [false, true]) {
       await expect(
         page.getByRole("heading", { name: "Profil Saya", exact: true }),
       ).toBeVisible();
-      await expect(
-        page.getByText(
-          `${populated ? 1 : 0} video terverifikasi di portofolio.`,
-          { exact: true },
-        ),
-      ).toBeVisible();
+      await expect(page.getByTestId("profile-video-count")).toBeVisible();
     }
     expect(errors).toEqual([]);
   });

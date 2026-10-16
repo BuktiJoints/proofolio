@@ -1,14 +1,22 @@
 "use client";
-import { Download } from "lucide-react";
+import { DesignIcon } from "./design-icon";
 import { Button } from "@/components/ui/button";
-export function PrintButton({ label = "Unduh PDF" }: { label?: string }) {
+export function PrintButton({
+  label = "Unduh PDF",
+  variant = "outline",
+  className = "",
+}: {
+  label?: string;
+  variant?: "outline" | "neutral";
+  className?: string;
+}) {
   return (
     <Button
-      variant="outline"
-      className="print:hidden"
+      variant={variant}
+      className={`print:hidden ${className}`}
       onClick={() => window.print()}
     >
-      <Download className="size-4" />
+      <DesignIcon name="download-blue" />
       {label}
     </Button>
   );

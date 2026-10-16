@@ -135,6 +135,9 @@ export const studentProfiles = pgTable("student_profiles", {
   phone: varchar("phone", { length: 20 }),
   schoolName: varchar("school_name", { length: 180 }),
   programKeahlian: varchar("program_keahlian", { length: 180 }),
+  notificationResultEnabled: boolean("notification_result_enabled")
+    .default(true)
+    .notNull(),
   notificationStatusEnabled: boolean("notification_status_enabled")
     .default(true)
     .notNull(),

@@ -96,3 +96,16 @@ export function pageParams(url: string) {
   return { page, limit, offset: (page - 1) * limit };
 }
 export const uuidParam = (value: string) => z.uuid().parse(value);
+
+export async function requestJson(
+  request: Request,
+  optional = false,
+): Promise<unknown> {
+  const raw = await request.text();
+  if (optional && !raw.trim()) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new ApiError(400, "VALIDATION_ERROR", "Body JSON tidak valid");
+  }
+}

@@ -18,13 +18,19 @@ export function Brand({
         inverse ? "text-neutral-10" : "text-primary-90",
       )}
     >
-      <span className="relative flex size-8 items-center justify-center rounded-lg bg-primary-70">
-        <Image src="/design/logo-check.svg" width={16} height={16} alt="" />
-        {!inverse && (
-          <span className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full border-2 border-neutral-10 bg-secondary-50" />
-        )}
+      <Image
+        src="/design/proofolio-mark.svg"
+        width={44}
+        height={32.44}
+        alt=""
+        className={inverse ? "rounded bg-white p-0.5" : undefined}
+      />
+      <span>
+        <span className={inverse ? "text-white" : "text-primary-70"}>Proo</span>
+        <span className={inverse ? "text-secondary-30" : "text-secondary-50"}>
+          folio
+        </span>
       </span>
-      Proofolio
     </Link>
   );
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "student_profiles" ADD COLUMN "notification_result_enabled" boolean DEFAULT true NOT NULL;

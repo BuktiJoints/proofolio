@@ -260,6 +260,7 @@ Criterion input:
 }
 ```
 
+Description indikator menerima 2..8000 karakter agar komponen dengan banyak subindikator PDF tidak terpotong.
 Dalam satu version, `code` dan `order` harus unik. `maxScore` adalah integer `1..100`.
 
 #### `GET /api/v1/rubrics`
@@ -284,42 +285,50 @@ Dalam satu version, `code` dan `order` harus unik. `maxScore` adalah integer `1.
 - Format diperiksa dari isi file, bukan filename atau MIME client.
 - PDF dikirim inline ke Gemini, tanpa penyimpanan object/file remote maupun row database.
 - Timeout ekstraksi 60 detik dengan abort provider; tidak ada retry otomatis yang menggandakan biaya.
+- Ekstraksi PDF memakai GEMINI_RUBRIC_MODEL (default gemini-2.5-flash), terpisah dari model video.
+  SDK tanpa retryOptions (satu request, status error provider tetap dipertahankan); schema provider memakai subset Gemini, hasil tetap divalidasi rubricInput.
+  Provider 429/503 dipetakan ke BUSY; 401/403/404 ke UNAVAILABLE tanpa raw error.
 - Success `200`: `{ data: { draft: { title, description, criteria[] }, simulated, requiresHumanReview: true } }`.
 - Calon draft wajib ditinjau/diedit asesor. Simpan melalui `POST /api/v1/rubrics` atau edit draft;
   publish tetap merupakan tindakan terpisah oleh asesor.
 - `FAKE_AI=true` mengembalikan contoh bertanda `simulated: true`, bukan ekstraksi isi dokumen.
 - Error: `400 MISSING_FIELDS / INVALID_RUBRIC_FILE`, `413 FILE_TOO_LARGE`,
   `415 INVALID_CONTENT_TYPE / UNSUPPORTED_RUBRIC_FILE`, `503 RUBRIC_EXTRACTION_TIMEOUT /
-  RUBRIC_EXTRACTION_INVALID / RUBRIC_EXTRACTION_FAILED`. Provider error tidak diteruskan.
+  RUBRIC_EXTRACTION_INVALID / RUBRIC_EXTRACTION_FAILED / RUBRIC_EXTRACTION_BUSY /
+  RUBRIC_EXTRACTION_UNAVAILABLE`. Provider error tidak diteruskan.
 - Output harus memenuhi schema rubric input, termasuk code/order unik dan maxScore integer 1..100.
 
 #### `GET /api/v1/rubrics/:id`
 
 - Role: authenticated dan organization-scoped.
 - Success `200`: rubric beserta versions dan criteria terurut.
-- Student hanya dapat membuka rubric `PUBLISHED`.
+- Student hanya dapat membuka rubric `PUBLISHED`; versions hanya berisi versi aktif, tanpa draf asesor.
 
 #### `PUT /api/v1/rubrics/:id/draft`
 
 - Role: `ASSESSOR`.
-- Hanya legal ketika rubric `DRAFT`.
-- Mengubah version terbaru yang belum diterbitkan; tidak boleh mengubah version historis.
+- Mengubah version terbaru yang belum diterbitkan, termasuk saat ada versi aktif lain.
+- Versi yang pernah diterbitkan tetap immutable.
 - Body sama dengan create rubric.
 - Success `200`: draft terbaru setelah perubahan.
-- Rubric `PUBLISHED` atau `ARCHIVED` menghasilkan `409`.
+- Target version yang pernah terbit menghasilkan `409 PUBLISHED_RUBRIC_IMMUTABLE`.
 
 #### `POST /api/v1/rubrics/:id/versions`
 
 - Role: `ASSESSOR`.
 - Body opsional. Tanpa body, clone version terbaru; dengan body, buat version dari input.
 - Success `201`: version draft baru.
-- Operasi mengubah aggregate ke `DRAFT` dan menonaktifkan `activeVersionId` sampai publish.
+- Membuat draft tidak mengubah versi aktif; aggregate tetap PUBLISHED atau ARCHIVED bila sudah memiliki versi aktif.
+- Tanpa versi aktif, aggregate tetap DRAFT (atau ARCHIVED bila sebelumnya diarsipkan).
 - Concurrent version creation harus menghasilkan nomor version unik tanpa `500`.
 
 #### `POST /api/v1/rubrics/:id/publish`
 
 - Role: `ASSESSOR`.
-- Menerbitkan draft version terbaru dan menetapkannya sebagai `activeVersionId`.
+- Body opsional `{ "versionId": UUID }`; tanpa body memilih versi terbaru.
+- Menerbitkan draf terpilih atau mengaktifkan kembali versi terbit dan menetapkannya sebagai `activeVersionId`.
+- Metadata aggregate mengikuti snapshot versi aktif; publishedAt awal tidak diubah saat aktivasi ulang.
+- Aktivasi dari ARCHIVED diperbolehkan; seluruh operasi memakai row lock aggregate.
 - Success `200`: rubric `PUBLISHED`.
 - Tidak boleh publish rubric tanpa version/criteria valid.
 
@@ -726,7 +735,28 @@ test selesai.
 - `GET /api/public/portfolios/:token` hanya tautan aktif/belum expired;
   mengembalikan nama, sekolah, jurusan, foto dan hasil pilihan COMPLETED beserta
   feedback final. Tidak mengekspos NISN, email, phone, session atau draft.
-- PDF memakai fasilitas cetak/simpan PDF browser dengan print stylesheet.
+- PDF memakai fasilitas cetak/simpan PDF browser dengan layout dokumen khusus A4,
+  terpisah dari UI layar untuk portofolio privat/publik dan hasil penilaian final.
   Dukungan dokumen rubrik tetap PDF 10 MiB; DOC belum tersedia.
 - Revisi nilai final menunggu keputusan produk; COMPLETED tetap terminal dan
   tidak dapat diubah. Tidak ada ambang kelulusan otomatis/badge lulus buatan.
+
+
+## 11. Revisi alur versi rubrik (16 Oktober 2026)
+
+Sesuai keputusan pengguna, asesor dapat memilih versi aktif dan menghapus draf lama.
+Versi yang pernah diterbitkan tetap immutable; submission lama selalu menunjuk snapshot semula.
+
+- `PUT /api/v1/rubrics/:id/versions/:versionId`: edit draf tertentu, body RubricInput, success 200.
+- `DELETE /api/v1/rubrics/:id/versions/:versionId`: hapus hanya versi yang belum pernah terbit,
+  success 200 `{ data: { id, deleted: true } }`. Tidak menghapus aggregate ataupun versi aktif.
+- Kedua endpoint ASSESSOR organization-scoped, validasi UUID, 404 resource di luar tenant,
+  409 PUBLISHED_RUBRIC_IMMUTABLE untuk versi terbit. Mutasi mengunci aggregate yang sama
+  dengan publish/create, sehingga publish vs delete tidak bisa menghapus versi aktif.
+- `PUT .../draft` tetap adapter kompatibel untuk draf terbaru.
+- Membuat/mengedit/menghapus draf tidak menonaktifkan versi aktif. Archive menghentikan
+  upload baru; publish dengan versionId mengaktifkan kembali snapshot terpilih.
+
+- Profil additive notificationResultEnabled (default true), terpisah dari preferensi status.
+  Pengiriman email tetap belum tersedia. GET portfolio menambahkan verifiedCriterionCount
+  dari keputusan manusia CONFIRMED/ADJUSTED pada review final, untuk ringkasan profil.

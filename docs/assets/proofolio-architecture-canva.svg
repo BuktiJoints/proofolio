@@ -1,0 +1,116 @@
+<svg width="1600" height="760" viewBox="0 0 1600 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ruleGradient" x1="342" y1="303" x2="1258" y2="467" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#214EB1"/>
+      <stop offset="1" stop-color="#08266A"/>
+    </linearGradient>
+    <linearGradient id="aiGradient" x1="660" y1="72" x2="940" y2="242" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F3F7FE"/>
+      <stop offset="1" stop-color="#E1ECFF"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#031644" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M1 1L9 5L1 9" stroke="#3C6CD2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- Main product flow -->
+  <g filter="url(#softShadow)">
+    <rect x="40" y="72" width="256" height="170" rx="28" fill="white" stroke="#D7DBE2" stroke-width="2"/>
+    <circle cx="168" cy="116" r="24" fill="#E1ECFF"/>
+    <path d="M158 104L180 116L158 128V104Z" fill="#214EB1"/>
+    <text x="168" y="163" text-anchor="middle" fill="#181B20" font-family="Poppins, Arial, sans-serif" font-size="22" font-weight="700">Video Siswa</text>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="356" y="72" width="256" height="170" rx="28" fill="white" stroke="#B1CCFF" stroke-width="2"/>
+    <rect x="460" y="94" width="48" height="42" rx="8" fill="#E1ECFF"/>
+    <path d="M470 106H498M470 114H492M470 122H486" stroke="#214EB1" stroke-width="3" stroke-linecap="round"/>
+    <text x="484" y="163" text-anchor="middle" fill="#181B20" font-family="Poppins, Arial, sans-serif" font-size="22" font-weight="700">Next.js Platform</text>
+    <text x="484" y="193" text-anchor="middle" fill="#74777E" font-family="Poppins, Arial, sans-serif" font-size="15">Web + API + Auth</text>
+    <text x="484" y="215" text-anchor="middle" fill="#214EB1" font-family="Poppins, Arial, sans-serif" font-size="14" font-weight="600">Modular Monolith</text>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="672" y="72" width="256" height="170" rx="28" fill="url(#aiGradient)" stroke="#81ABFF" stroke-width="2"/>
+    <path d="M800 93L806 108L821 114L806 120L800 135L794 120L779 114L794 108L800 93Z" fill="#214EB1"/>
+    <circle cx="821" cy="98" r="4" fill="#5A8BEE"/>
+    <circle cx="779" cy="132" r="3" fill="#5A8BEE"/>
+    <text x="800" y="163" text-anchor="middle" fill="#181B20" font-family="Poppins, Arial, sans-serif" font-size="22" font-weight="700">AI Analysis</text>
+    <text x="800" y="193" text-anchor="middle" fill="#52555C" font-family="Poppins, Arial, sans-serif" font-size="15">Async Worker</text>
+    <text x="800" y="215" text-anchor="middle" fill="#214EB1" font-family="Poppins, Arial, sans-serif" font-size="14" font-weight="600">Structured Evidence</text>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="988" y="72" width="256" height="170" rx="28" fill="white" stroke="#B1CCFF" stroke-width="2"/>
+    <circle cx="1116" cy="113" r="22" fill="#E1ECFF"/>
+    <path d="M1105 113L1112 120L1128 104" stroke="#214EB1" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="1116" y="163" text-anchor="middle" fill="#181B20" font-family="Poppins, Arial, sans-serif" font-size="22" font-weight="700">Verifikasi Asesor</text>
+    <text x="1116" y="193" text-anchor="middle" fill="#74777E" font-family="Poppins, Arial, sans-serif" font-size="15">Human-in-the-Loop</text>
+    <text x="1116" y="215" text-anchor="middle" fill="#214EB1" font-family="Poppins, Arial, sans-serif" font-size="14" font-weight="600">Keputusan final manusia</text>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="1304" y="72" width="256" height="170" rx="28" fill="white" stroke="#D7DBE2" stroke-width="2"/>
+    <path d="M1432 94L1438 106L1452 108L1442 118L1444 132L1432 125L1420 132L1422 118L1412 108L1426 106L1432 94Z" fill="#214EB1"/>
+    <text x="1432" y="157" text-anchor="middle" fill="#181B20" font-family="Poppins, Arial, sans-serif" font-size="20" font-weight="700">Portofolio</text>
+    <text x="1432" y="182" text-anchor="middle" fill="#181B20" font-family="Poppins, Arial, sans-serif" font-size="20" font-weight="700">Terverifikasi</text>
+  </g>
+
+  <!-- Directional connectors -->
+  <path d="M306 157H340" stroke="#3C6CD2" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M622 157H656" stroke="#3C6CD2" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M938 157H972" stroke="#3C6CD2" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M1254 157H1288" stroke="#3C6CD2" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+  <!-- Rule Engine governance connections -->
+  <path d="M484 242V282" stroke="#81ABFF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M800 242V282" stroke="#81ABFF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M1116 242V282" stroke="#81ABFF" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="484" cy="282" r="5" fill="#3C6CD2"/>
+  <circle cx="800" cy="282" r="5" fill="#3C6CD2"/>
+  <circle cx="1116" cy="282" r="5" fill="#3C6CD2"/>
+
+  <!-- Rule Engine focal point -->
+  <g filter="url(#softShadow)">
+    <rect x="342" y="296" width="916" height="174" rx="34" fill="url(#ruleGradient)"/>
+    <circle cx="411" cy="355" r="32" fill="white" fill-opacity="0.12"/>
+    <path d="M411 334L429 344V365L411 376L393 365V344L411 334Z" stroke="white" stroke-width="3"/>
+    <path d="M402 355L409 362L421 348" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="461" y="350" fill="white" font-family="Poppins, Arial, sans-serif" font-size="30" font-weight="800" letter-spacing="1">RULE ENGINE</text>
+    <text x="461" y="381" fill="#D7E0F1" font-family="Poppins, Arial, sans-serif" font-size="16">Pusat kendali proses dan kualitas penilaian</text>
+
+    <rect x="454" y="408" width="158" height="36" rx="18" fill="white" fill-opacity="0.12" stroke="white" stroke-opacity="0.18"/>
+    <text x="533" y="431" text-anchor="middle" fill="white" font-family="Poppins, Arial, sans-serif" font-size="14" font-weight="600">Workflow</text>
+    <rect x="626" y="408" width="186" height="36" rx="18" fill="white" fill-opacity="0.12" stroke="white" stroke-opacity="0.18"/>
+    <text x="719" y="431" text-anchor="middle" fill="white" font-family="Poppins, Arial, sans-serif" font-size="14" font-weight="600">Rubric Validation</text>
+    <rect x="826" y="408" width="156" height="36" rx="18" fill="white" fill-opacity="0.12" stroke="white" stroke-opacity="0.18"/>
+    <text x="904" y="431" text-anchor="middle" fill="white" font-family="Poppins, Arial, sans-serif" font-size="14" font-weight="600">Scoring</text>
+    <rect x="996" y="408" width="190" height="36" rx="18" fill="white" fill-opacity="0.12" stroke="white" stroke-opacity="0.18"/>
+    <text x="1091" y="431" text-anchor="middle" fill="white" font-family="Poppins, Arial, sans-serif" font-size="14" font-weight="600">Atomic Audit Trail</text>
+  </g>
+
+  <!-- Data foundation -->
+  <path d="M800 470V507" stroke="#81ABFF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M800 507H590V529" stroke="#81ABFF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M800 507H1010V529" stroke="#81ABFF" stroke-width="3" stroke-linecap="round"/>
+
+  <g>
+    <rect x="410" y="529" width="360" height="108" rx="26" fill="#F3F7FE" stroke="#B1CCFF" stroke-width="2"/>
+    <ellipse cx="466" cy="565" rx="22" ry="8" fill="#214EB1"/>
+    <path d="M444 565V594C444 599 454 603 466 603C478 603 488 599 488 594V565" stroke="#214EB1" stroke-width="3"/>
+    <path d="M444 579C444 584 454 588 466 588C478 588 488 584 488 579" stroke="#214EB1" stroke-width="3"/>
+    <text x="510" y="570" fill="#181B20" font-family="Poppins, Arial, sans-serif" font-size="20" font-weight="700">PostgreSQL 17</text>
+    <text x="510" y="598" fill="#74777E" font-family="Poppins, Arial, sans-serif" font-size="14">Data, job queue, dan audit event</text>
+  </g>
+
+  <g>
+    <rect x="830" y="529" width="360" height="108" rx="26" fill="#F3F7FE" stroke="#B1CCFF" stroke-width="2"/>
+    <path d="M866 576C866 565 875 556 886 556C895 556 902 561 905 569C908 567 912 566 916 566C926 566 934 574 934 584C934 594 926 602 916 602H878C867 602 858 594 858 584C858 580 861 577 866 576Z" fill="#214EB1"/>
+    <text x="958" y="570" fill="#181B20" font-family="Poppins, Arial, sans-serif" font-size="20" font-weight="700">Private MinIO / S3</text>
+    <text x="958" y="598" fill="#74777E" font-family="Poppins, Arial, sans-serif" font-size="14">Penyimpanan video privat</text>
+  </g>
+
+</svg>

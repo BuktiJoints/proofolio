@@ -11,7 +11,7 @@ export const rubricFormSchema = z
         z.object({
           code: z.string().trim().min(1).max(40),
           title: z.string().trim().min(2).max(180),
-          description: z.string().trim().min(2).max(2000),
+          description: z.string().trim().min(2).max(8000),
           order: z.number().int().min(0),
           required: z.boolean(),
           maxScore: z.number().int().min(1).max(100),

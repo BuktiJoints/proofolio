@@ -63,6 +63,23 @@ describe("frontend and API input rules", () => {
         criteria: [criterion, criterion],
       }).success,
     ).toBe(false));
+  it("accepts full PDF indicators through 8000 characters in the editor", () => {
+    for (const length of [2300, 8000])
+      expect(
+        rubricFormSchema.safeParse({
+          title: "Rubrik",
+          description: null,
+          criteria: [{ ...criterion, description: "x".repeat(length) }],
+        }).success,
+      ).toBe(true);
+    expect(
+      rubricFormSchema.safeParse({
+        title: "Rubrik",
+        description: null,
+        criteria: [{ ...criterion, description: "x".repeat(8001) }],
+      }).success,
+    ).toBe(false);
+  });
   it("rejects invalid UUIDs and pagination", () => {
     expect(isUuid("bad-id")).toBe(false);
     expect(() => uuidParam("bad-id")).toThrow();

@@ -10,5 +10,14 @@ export const GET = (_: Request, ctx: RouteContext<"/api/v1/rubrics/[id]">) =>
     const result = await rubricDetail(id, user.organizationId);
     if (user.role === "STUDENT" && result.status !== "PUBLISHED")
       throw new ApiError(404, "RUBRIC_NOT_FOUND", "Rubrik tidak ditemukan");
-    return ok(result);
+    return ok(
+      user.role === "STUDENT"
+        ? {
+            ...result,
+            versions: result.versions.filter(
+              (v) => v.id === result.activeVersionId,
+            ),
+          }
+        : result,
+    );
   });

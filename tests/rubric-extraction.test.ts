@@ -30,6 +30,20 @@ describe("rubric PDF extraction", () => {
     const result = await extractRubricDraft(pdf, async () => draft);
     expect(result.draft.description).toBeNull();
   });
+  it("preserves long component indicators without truncation, with a bounded limit", async () => {
+    const description = "Indikator pelayanan kamar.\n".repeat(100);
+    const result = await extractRubricDraft(pdf, async () => ({
+      ...draft,
+      criteria: [{ ...draft.criteria[0], description }],
+    }));
+    expect(result.draft.criteria[0].description).toBe(description.trim());
+    await expect(
+      extractRubricDraft(pdf, async () => ({
+        ...draft,
+        criteria: [{ ...draft.criteria[0], description: "x".repeat(8001) }],
+      })),
+    ).rejects.toMatchObject({ code: "RUBRIC_EXTRACTION_INVALID" });
+  });
   it("does not trust a PDF extension or claimed MIME", () =>
     expect(() => validateRubricPdf(Buffer.from("not a PDF"))).toThrow("PDF"));
   it("rejects oversized files", () =>
@@ -123,5 +137,43 @@ describe("multipart bounds", () => {
         new Request("http://localhost", { method: "POST", body: form }),
       ),
     ).rejects.toMatchObject({ code: "MISSING_FIELDS" });
+  });
+});
+
+describe("safe extraction dependency errors", () => {
+  it.each([429, 503])(
+    "reports temporary provider status %i without leaking details",
+    async (status) => {
+      await expect(
+        extractRubricDraft(pdf, async () => {
+          throw Object.assign(new Error("private"), { status });
+        }),
+      ).rejects.toMatchObject({ code: "RUBRIC_EXTRACTION_BUSY", status: 503 });
+    },
+  );
+  it.each([401, 403, 404])(
+    "reports provider access/configuration status %i safely",
+    async (status) => {
+      await expect(
+        extractRubricDraft(pdf, async () => {
+          throw Object.assign(new Error("private"), { status });
+        }),
+      ).rejects.toMatchObject({
+        code: "RUBRIC_EXTRACTION_UNAVAILABLE",
+        status: 503,
+      });
+    },
+  );
+  it("maps SDK timeout and malformed JSON to stable errors", async () => {
+    await expect(
+      extractRubricDraft(pdf, async () => {
+        throw new DOMException("private", "TimeoutError");
+      }),
+    ).rejects.toMatchObject({ code: "RUBRIC_EXTRACTION_TIMEOUT" });
+    await expect(
+      extractRubricDraft(pdf, async () => {
+        throw new SyntaxError("private");
+      }),
+    ).rejects.toMatchObject({ code: "RUBRIC_EXTRACTION_INVALID" });
   });
 });
