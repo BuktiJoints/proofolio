@@ -68,7 +68,7 @@ export function DashboardPage({ role }: { role: Role }) {
       <section
         className={cn(
           "relative isolate flex flex-col justify-between gap-6 overflow-hidden rounded-2xl p-6 text-neutral-10 md:min-h-46 md:flex-row md:items-center md:p-10",
-          student ? "bg-primary-70" : "bg-primary-90",
+          student ? "bg-primary-90" : "bg-primary-90",
         )}
       >
         <span
@@ -76,7 +76,7 @@ export function DashboardPage({ role }: { role: Role }) {
           data-testid="dashboard-banner-decoration"
           className={cn(
             "pointer-events-none absolute -top-14 -right-14 -z-10 size-64 rounded-full border-[32px]",
-            student ? "border-primary-60" : "border-primary-80",
+            student ? "border-primary-80" : "border-primary-80",
           )}
         />
         <div className="min-w-0 flex-1 space-y-5">
