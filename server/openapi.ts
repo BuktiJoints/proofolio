@@ -78,7 +78,7 @@ export const openapi = {
   openapi: "3.1.0",
   info: {
     title: "BuktiPraktik API",
-    version: "1.3.0",
+    version: "1.4.0",
     description:
       "AI menghasilkan calon bukti dan draft rubrik. Penilaian akhir dan penerbitan rubrik tetap dilakukan asesor.",
   },
@@ -130,6 +130,7 @@ export const openapi = {
           schoolName: { type: ["string", "null"] },
           programKeahlian: { type: ["string", "null"] },
           notificationStatusEnabled: { type: "boolean" },
+          notificationResultEnabled: { type: "boolean" },
         },
       },
       CriterionInput: {
@@ -657,6 +658,7 @@ export const openapi = {
             schoolName: { type: ["string", "null"] },
             programKeahlian: { type: ["string", "null"] },
             notificationStatusEnabled: { type: "boolean" },
+            notificationResultEnabled: { type: "boolean" },
           },
         }),
         {
@@ -671,6 +673,7 @@ export const openapi = {
               phone: { type: ["string", "null"] },
               image: { type: ["string", "null"], format: "uri" },
               notificationStatusEnabled: { type: "boolean" },
+              notificationResultEnabled: { type: "boolean" },
             },
           }),
         },
@@ -746,20 +749,24 @@ export const openapi = {
     },
     "/api/v1/rubrics/{id}": {
       get: operation(
-        "Rubrik beserta versi dan kriteria",
+        "Rubrik beserta versi dan kriteria; siswa hanya menerima versi aktif",
         envelope(ref("Rubric")),
         { parameters: [idParameter] },
       ),
     },
     "/api/v1/rubrics/{id}/draft": {
-      put: operation("Edit versi draft terbaru", envelope(ref("Rubric")), {
-        parameters: [idParameter],
-        requestBody: body(ref("RubricInput")),
-      }),
+      put: operation(
+        "Edit versi draft terbaru tanpa mengubah versi aktif",
+        envelope(ref("RubricVersion")),
+        {
+          parameters: [idParameter],
+          requestBody: body(ref("RubricInput")),
+        },
+      ),
     },
     "/api/v1/rubrics/{id}/versions": {
       post: operation(
-        "Buat versi draft baru dan nonaktifkan activeVersionId",
+        "Buat versi draft baru tanpa mengubah activeVersionId",
         envelope(ref("RubricVersion")),
         {
           parameters: [idParameter],
@@ -768,10 +775,44 @@ export const openapi = {
         201,
       ),
     },
+    "/api/v1/rubrics/{id}/versions/{versionId}": {
+      put: operation(
+        "Edit draf tertentu; versi terbit immutable",
+        envelope(ref("RubricVersion")),
+        {
+          parameters: [
+            idParameter,
+            { name: "versionId", in: "path", required: true, schema: uuid },
+          ],
+          requestBody: body(ref("RubricInput")),
+        },
+      ),
+      delete: operation(
+        "Hapus draf yang belum pernah terbit",
+        envelope({
+          type: "object",
+          properties: { id: uuid, deleted: { const: true } },
+        }),
+        {
+          parameters: [
+            idParameter,
+            { name: "versionId", in: "path", required: true, schema: uuid },
+          ],
+        },
+      ),
+    },
     "/api/v1/rubrics/{id}/publish": {
-      post: operation("Terbitkan draft tersimpan", envelope(ref("Rubric")), {
-        parameters: [idParameter],
-      }),
+      post: operation(
+        "Publikasikan atau aktifkan versi terpilih",
+        envelope(ref("Rubric")),
+        {
+          parameters: [idParameter],
+          requestBody: {
+            ...body({ type: "object", properties: { versionId: uuid } }),
+            required: false,
+          },
+        },
+      ),
     },
     "/api/v1/rubrics/{id}/archive": {
       post: operation("Arsipkan rubrik", envelope(ref("Rubric")), {
@@ -924,6 +965,7 @@ export const openapi = {
               submission: ref("Submission"),
               rubric: ref("RubricVersion"),
               shares: array(ref("Share")),
+              verifiedCriterionCount: { type: "integer", minimum: 0 },
             },
           }),
         ),

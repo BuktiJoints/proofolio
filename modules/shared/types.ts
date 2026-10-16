@@ -28,6 +28,7 @@ export type Me = {
     schoolName: string | null;
     programKeahlian: string | null;
     notificationStatusEnabled: boolean;
+    notificationResultEnabled?: boolean;
   } | null;
 };
 export type Envelope<T> = { data: T };
@@ -73,6 +74,9 @@ export type RubricInput = {
   criteria: CriterionInput[];
 };
 export type RubricVersion = {
+  rubricId?: string;
+  createdAt?: string;
+  updatedAt?: string;
   programKeahlian?: string | null;
   partnerName?: string | null;
   requirements?: string | null;

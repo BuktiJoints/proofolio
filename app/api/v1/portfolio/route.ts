@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { currentUser } from "@/server/auth";
 import { db } from "@/server/db";
 import {
@@ -11,7 +11,11 @@ export const GET = () =>
   route(async () => {
     const user = await currentUser(["STUDENT"]);
     const rows = await db
-      .select({ submission: submissions, rubric: rubricVersions })
+      .select({
+        submission: submissions,
+        rubric: rubricVersions,
+        verifiedCriterionCount: sql<number>`(select count(*)::int from review_items ri join assessment_reviews ar on ar.id=ri.review_id where ar.submission_id=${submissions.id} and ar.finalized_at is not null and ri.decision in ('CONFIRMED','ADJUSTED'))`,
+      })
       .from(submissions)
       .innerJoin(
         rubricVersions,

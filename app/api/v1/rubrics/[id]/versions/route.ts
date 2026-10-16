@@ -3,7 +3,7 @@ import { currentUser } from "@/server/auth";
 import { db } from "@/server/db";
 import { rubrics } from "@/server/db/schema";
 import { createVersion, rubricInput } from "@/server/domain/rubrics";
-import { uuidParam, ApiError, ok, route } from "@/server/http";
+import { uuidParam, ApiError, ok, route, requestJson } from "@/server/http";
 
 export const POST = (
   request: Request,
@@ -25,8 +25,8 @@ export const POST = (
       .limit(1);
     if (!rubric)
       throw new ApiError(404, "RUBRIC_NOT_FOUND", "Rubrik tidak ditemukan");
-    const raw = await request.text();
-    const body = raw ? rubricInput.parse(JSON.parse(raw)) : undefined;
-    const version = await createVersion(id, user.id, body);
+    const raw = await requestJson(request, true);
+    const body = raw === undefined ? undefined : rubricInput.parse(raw);
+    const version = await createVersion(id, user.id, body, user.organizationId);
     return ok(version, { status: 201 });
   });

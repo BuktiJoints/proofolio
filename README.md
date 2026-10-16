@@ -301,10 +301,9 @@ Profile body:
 }
 ```
 
-`nisn`, `phone`, `image`, dan `notificationStatusEnabled` bersifat additive agar client lama tetap
+`nisn`, `phone`, `image`, `notificationStatusEnabled`, dan `notificationResultEnabled` bersifat additive agar client lama tetap
 dapat menyimpan field profil lama. Namun NISN, nomor telepon, sekolah, dan program keahlian wajib
-lengkap sebelum upload. Login MVP tetap menggunakan email/password; nomor telepon adalah data
-profil, bukan identifier login. Foto profil disimpan sebagai URL, bukan file yang dikelola server.
+lengkap sebelum upload. Form login aplikasi mendukung email/telepon siswa dan email/NIP asesor yang sudah disetujui. Foto profil disimpan sebagai URL, bukan file yang dikelola server.
 
 ### Rubrics
 
@@ -316,8 +315,13 @@ profil, bukan identifier login. Foto profil disimpan sebagai URL, bukan file yan
 | `GET` | `/api/v1/rubrics/:id` | Authenticated | `200` | Detail versions dan criteria |
 | `PUT` | `/api/v1/rubrics/:id/draft` | Assessor | `200` | Mengubah draft version terbaru |
 | `POST` | `/api/v1/rubrics/:id/versions` | Assessor | `201` | Membuat version baru atau clone terbaru |
-| `POST` | `/api/v1/rubrics/:id/publish` | Assessor | `200` | Menerbitkan version terbaru |
+| `POST` | `/api/v1/rubrics/:id/publish` | Assessor | `200` | Memilih versi aktif melalui optional body `{ versionId }`; default terbaru |
+| `PUT` | `/api/v1/rubrics/:id/versions/:versionId` | Assessor | `200` | Edit draf tertentu yang belum pernah terbit |
+| `DELETE` | `/api/v1/rubrics/:id/versions/:versionId` | Assessor | `200` | Hapus draf yang belum pernah terbit |
 | `POST` | `/api/v1/rubrics/:id/archive` | Assessor | `200` | Mengarsipkan rubric |
+
+Membuat draf tidak menonaktifkan versi aktif. Versi terbit tetap immutable; siswa hanya menerima
+versi aktif. Asesor dapat mengaktifkan kembali versi terbit setelah archive atau perpindahan versi.
 
 Create/edit rubric body:
 
