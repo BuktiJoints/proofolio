@@ -260,6 +260,7 @@ Criterion input:
 }
 ```
 
+Description indikator menerima 2..8000 karakter agar komponen dengan banyak subindikator PDF tidak terpotong.
 Dalam satu version, `code` dan `order` harus unik. `maxScore` adalah integer `1..100`.
 
 #### `GET /api/v1/rubrics`
@@ -284,13 +285,17 @@ Dalam satu version, `code` dan `order` harus unik. `maxScore` adalah integer `1.
 - Format diperiksa dari isi file, bukan filename atau MIME client.
 - PDF dikirim inline ke Gemini, tanpa penyimpanan object/file remote maupun row database.
 - Timeout ekstraksi 60 detik dengan abort provider; tidak ada retry otomatis yang menggandakan biaya.
+- Ekstraksi PDF memakai GEMINI_RUBRIC_MODEL (default gemini-2.5-flash), terpisah dari model video.
+  SDK tanpa retryOptions (satu request, status error provider tetap dipertahankan); schema provider memakai subset Gemini, hasil tetap divalidasi rubricInput.
+  Provider 429/503 dipetakan ke BUSY; 401/403/404 ke UNAVAILABLE tanpa raw error.
 - Success `200`: `{ data: { draft: { title, description, criteria[] }, simulated, requiresHumanReview: true } }`.
 - Calon draft wajib ditinjau/diedit asesor. Simpan melalui `POST /api/v1/rubrics` atau edit draft;
   publish tetap merupakan tindakan terpisah oleh asesor.
 - `FAKE_AI=true` mengembalikan contoh bertanda `simulated: true`, bukan ekstraksi isi dokumen.
 - Error: `400 MISSING_FIELDS / INVALID_RUBRIC_FILE`, `413 FILE_TOO_LARGE`,
   `415 INVALID_CONTENT_TYPE / UNSUPPORTED_RUBRIC_FILE`, `503 RUBRIC_EXTRACTION_TIMEOUT /
-  RUBRIC_EXTRACTION_INVALID / RUBRIC_EXTRACTION_FAILED`. Provider error tidak diteruskan.
+  RUBRIC_EXTRACTION_INVALID / RUBRIC_EXTRACTION_FAILED / RUBRIC_EXTRACTION_BUSY /
+  RUBRIC_EXTRACTION_UNAVAILABLE`. Provider error tidak diteruskan.
 - Output harus memenuhi schema rubric input, termasuk code/order unik dan maxScore integer 1..100.
 
 #### `GET /api/v1/rubrics/:id`
@@ -730,7 +735,8 @@ test selesai.
 - `GET /api/public/portfolios/:token` hanya tautan aktif/belum expired;
   mengembalikan nama, sekolah, jurusan, foto dan hasil pilihan COMPLETED beserta
   feedback final. Tidak mengekspos NISN, email, phone, session atau draft.
-- PDF memakai fasilitas cetak/simpan PDF browser dengan print stylesheet.
+- PDF memakai fasilitas cetak/simpan PDF browser dengan layout dokumen khusus A4,
+  terpisah dari UI layar untuk portofolio privat/publik dan hasil penilaian final.
   Dukungan dokumen rubrik tetap PDF 10 MiB; DOC belum tersedia.
 - Revisi nilai final menunggu keputusan produk; COMPLETED tetap terminal dan
   tidak dapat diubah. Tidak ada ambang kelulusan otomatis/badge lulus buatan.

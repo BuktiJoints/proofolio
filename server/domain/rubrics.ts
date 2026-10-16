@@ -7,7 +7,7 @@ import { ApiError } from "@/server/http";
 export const criterionInput = z.object({
   code: z.string().trim().min(1).max(40),
   title: z.string().trim().min(2).max(180),
-  description: z.string().trim().min(2).max(2000),
+  description: z.string().trim().min(2).max(8000),
   order: z.number().int().nonnegative(),
   required: z.boolean().default(true),
   maxScore: z.number().int().min(1).max(100),

@@ -361,7 +361,7 @@ export function RubricEditor({
                           value={line}
                           required
                           minLength={2}
-                          maxLength={2000}
+                          maxLength={8000}
                           onChange={(e) => {
                             const indicators = c.description.split("\n");
                             indicators[i] = e.target.value;

@@ -186,6 +186,7 @@ Compose membentuk `DATABASE_URL` internal menggunakan service hostname `db`. Nil
 | Variable | Wajib | Keterangan |
 |---|---:|---|
 | `GEMINI_API_KEY` | Jika real AI | API key Google Gemini |
+| `GEMINI_RUBRIC_MODEL` | Tidak | Model ekstraksi PDF, default `gemini-2.5-flash`; terpisah dari video |
 | `GEMINI_MODEL` | Ya | Set eksplisit; `gemini-3.7-flash` telah berhasil diuji |
 | `GEMINI_REQUEST_TIMEOUT_MS` | Ya | Batas total request/download/upload/generation Gemini; default 300000 |
 | `GEMINI_FILE_PROCESSING_TIMEOUT_MS` | Ya | Batas polling file Gemini; default 180000 |
@@ -352,7 +353,7 @@ Asesor dapat mengirim satu PDF melalui `POST /api/v1/rubrics/extract` menggunaka
 timeout 60 detik. Dokumen dan hasil ekstraksi tidak disimpan otomatis. Setelah memeriksa judul,
 kriteria dan bobot, simpan draft dengan endpoint rubric biasa, lalu publish secara terpisah.
 Dengan `FAKE_AI=true`, output adalah contoh simulasi, bukan pembacaan isi PDF. Mode nyata memerlukan
-`GEMINI_API_KEY` dan model yang mendukung PDF/structured output. Jika gagal, isi rubrik manual.
+`GEMINI_API_KEY` dan `GEMINI_RUBRIC_MODEL` yang mendukung PDF/structured output (default `gemini-2.5-flash`). SDK hanya melakukan satu percobaan; layanan sibuk/kuota terbatas ditampilkan secara aman agar pengguna bisa mencoba ulang secara manual. Model video tetap memakai `GEMINI_MODEL`.
 
 ### Submissions dan AI analysis
 

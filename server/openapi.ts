@@ -146,7 +146,7 @@ export const openapi = {
         properties: {
           code: { type: "string", minLength: 1, maxLength: 40 },
           title: { type: "string", minLength: 2, maxLength: 180 },
-          description: { type: "string", minLength: 2, maxLength: 2000 },
+          description: { type: "string", minLength: 2, maxLength: 8000 },
           order: { type: "integer", minimum: 0 },
           required: { type: "boolean" },
           maxScore: { type: "integer", minimum: 1, maximum: 100 },
@@ -725,7 +725,7 @@ export const openapi = {
         }),
         {
           description:
-            "PDF maksimal 10 MiB; MIME diperiksa dari isi. Timeout 60 detik. Error: MISSING_FIELDS, INVALID_RUBRIC_FILE, FILE_TOO_LARGE, INVALID_CONTENT_TYPE, UNSUPPORTED_RUBRIC_FILE, RUBRIC_EXTRACTION_TIMEOUT, RUBRIC_EXTRACTION_INVALID, RUBRIC_EXTRACTION_FAILED. FAKE_AI menghasilkan contoh, bukan ekstraksi isi file.",
+            "PDF maksimal 10 MiB; MIME diperiksa dari isi. Timeout 60 detik. Error: MISSING_FIELDS, INVALID_RUBRIC_FILE, FILE_TOO_LARGE, INVALID_CONTENT_TYPE, UNSUPPORTED_RUBRIC_FILE, RUBRIC_EXTRACTION_TIMEOUT, RUBRIC_EXTRACTION_INVALID, RUBRIC_EXTRACTION_FAILED, RUBRIC_EXTRACTION_BUSY (provider 429/503), RUBRIC_EXTRACTION_UNAVAILABLE (provider 401/403/404). Satu request provider tanpa retry SDK; model PDF dikonfigurasi terpisah. FAKE_AI menghasilkan contoh, bukan ekstraksi isi file.",
           requestBody: {
             required: true,
             content: {
