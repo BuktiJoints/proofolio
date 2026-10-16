@@ -72,8 +72,8 @@ localStorage. Halaman bukti publik memakai noindex dan no-referrer.
    Dua tab dalam profil browser yang sama berbagi session; gunakan incognito atau profil berbeda.
 3. Asesor membuka Rubrik → Buat rubrik. Isi manual, atau pilih satu PDF maksimal 10 MiB → Ekstrak.
    Dengan `FAKE_AI=true`, hasil adalah contoh simulasi, bukan pembacaan isi file. Pilih Gunakan hasil,
-   tinjau/edit tiap kriteria dan bobot, Simpan draft, lalu Terbitkan rubrik tersimpan.
-   Perubahan draft yang belum disimpan menonaktifkan tombol publish.
+   tinjau/edit tiap kriteria dan bobot, Simpan Rubrik Digital, lalu Publikasi Rubrik pada versi terpilih.
+   Editor terpisah dari halaman kelola versi; perubahan yang belum disimpan belum dapat dipublikasikan.
 4. Siswa membuka rubrik aktif, mempelajari kriteria, dan mengajukan video MP4/WebM/MOV.
    Batas mengikuti environment (default 100 MiB dan 120 detik). UI tidak mengklaim hasil AI selesai
    ketika upload diterima; status dipantau otomatis. Worker harus berjalan.
@@ -186,3 +186,6 @@ bunx playwright test tests/e2e/profile-schema.spec.ts
 
 Lihat [panduan implementasi WBS](wbs-implementation.md) untuk pendaftaran asesor,
 perintah persetujuan admin, portofolio publik dan batas fitur saat ini.
+
+Revisi editor dan pengelolaan versi: `/assessor/rubrics/:id/edit?versionId=UUID` serta
+`/assessor/rubrics/:id/versions/new`. Daftar versi tetap berada di `/assessor/rubrics/:id`.

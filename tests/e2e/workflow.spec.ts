@@ -154,39 +154,42 @@ test("student registration → PDF rubric → video → assessor review → port
       })
       .click();
     const title = `Rubrik browser ${fixture.run}`;
-    await assessorPage.getByLabel("Judul rubrik", { exact: true }).fill(title);
-    await assessorPage.getByLabel("Skor maksimal", { exact: true }).fill("80");
     await assessorPage
-      .getByRole("button", { name: "Tambah kriteria", exact: true })
+      .getByLabel("Judul Modul UKK", { exact: true })
+      .fill(title);
+    await assessorPage
+      .getByLabel("Bobot kriteria 1", { exact: true })
+      .fill("80");
+    await assessorPage
+      .getByRole("button", { name: "Tambah Kriteria", exact: true })
       .click();
-    await assessorPage.getByLabel("Kode", { exact: true }).nth(1).fill("OPT");
     await assessorPage
-      .getByLabel("Judul kriteria", { exact: true })
-      .nth(1)
+      .getByLabel("Judul kriteria 2", { exact: true })
       .fill("Dokumentasi opsional");
     await assessorPage
-      .getByLabel("Deskripsi yang dapat diamati", { exact: true })
-      .nth(1)
+      .getByLabel("Indikator bukti kriteria 2 ke 1", { exact: true })
       .fill("Dokumentasi langkah praktik terlihat");
     await assessorPage
-      .getByLabel("Skor maksimal", { exact: true })
-      .nth(1)
+      .getByLabel("Bobot kriteria 2", { exact: true })
       .fill("20");
     await assessorPage
-      .getByRole("checkbox", { name: "Kriteria wajib", exact: true })
+      .getByText("Pengaturan kriteria", { exact: true })
       .nth(1)
+      .click();
+    await assessorPage
+      .getByRole("checkbox", { name: "Kriteria wajib", exact: true })
       .uncheck();
     await assessorPage
-      .getByRole("button", { name: "Simpan draft rubrik", exact: true })
+      .getByRole("button", { name: "Simpan Rubrik Digital", exact: true })
       .click();
     await expect(
       assessorPage.getByRole("heading", { name: title, exact: true }),
     ).toBeVisible();
     await assessorPage
-      .getByRole("button", { name: "Terbitkan rubrik tersimpan", exact: true })
+      .getByRole("button", { name: "Publikasi Rubrik", exact: true })
       .click();
     await expect(
-      assessorPage.getByText("Terbit", { exact: true }),
+      assessorPage.getByText("• Aktif", { exact: true }),
     ).toBeVisible();
     await studentPage.goto("/student/rubrics");
     await expect(studentPage.getByText(title, { exact: true })).toBeVisible();
@@ -194,6 +197,7 @@ test("student registration → PDF rubric → video → assessor review → port
     await studentPage
       .getByRole("link", { name: "Lihat Detail & Rubrik", exact: true })
       .click();
+    await expect(studentPage.getByTestId("criterion-points")).toHaveCount(2);
     const points = await studentPage
       .getByTestId("criterion-points")
       .evaluateAll((items) =>

@@ -115,3 +115,27 @@ Gunakan profil browser berbeda untuk siswa dan asesor agar session tidak tertuka
 | Draft dan hasil final | Asesor simpan sebagian nilai/feedback, reload, periksa detail siswa, lalu lengkapi dan finalisasi. | Draft tersimpan dan belum terlihat siswa. Setelah finalisasi, siswa melihat skor/feedback final. |
 | Portofolio dan akses publik | Tambahkan hasil selesai ke portofolio, aktifkan Publik, buka link di incognito, lalu ubah ke Pribadi. | Hanya hasil terpilih tampil; link dapat dibuka tanpa login dan tidak lagi valid setelah dicabut. |
 | Validasi dan batas akses | Coba video di atas batas ukuran/durasi, skor lebih besar dari poin maksimal, serta URL detail milik akun/organisasi lain. | Input tidak valid ditolak dengan pesan yang aman; data pihak lain tidak tampil. |
+
+
+## Revisi desain 16 Oktober 2026
+
+- Logo memakai simbol asli `proofolio-logo` dan wordmark dua warna.
+- Banner siswa/asesor memakai susunan bersama dan dekorasi lingkaran, dengan warna dan identitas sesuai role.
+- Tombol kembali modul berupa tautan teks. Detail siswa memisahkan tujuan, indikator rubrik, peralatan, dan tips rekaman.
+- Profil menempatkan Edit Profil di kartu identitas, field dalam dua kolom, ringkasan hasil dan pengaturan di kanan.
+  Preferensi status dan hasil dapat disimpan terpisah; email tetap belum tersedia. Password memakai dialog.
+- Portofolio menampilkan skill unik, lencana hasil final, dan jumlah bukti yang dikonfirmasi manusia.
+  Badge menggunakan Terverifikasi karena belum ada aturan kelulusan. Berbagi video per hasil tersedia melalui menu titik tiga.
+- Asesor membuka kelola modul untuk melihat daftar versi. Expand versi untuk melihat rubrik, Edit untuk membuka
+  editor draf, atau Buat Draf Baru untuk menyiapkan versi berikutnya. Simpan Rubrik Digital kembali ke daftar versi.
+- Publikasi Rubrik menetapkan versi terpilih sebagai aktif. Aktivasi versi terbit dan penghapusan draf lama
+  didukung sesuai keputusan produk; versi yang pernah terbit tetap terkunci. Membuat draf tidak menghentikan
+  versi aktif. Siswa hanya menerima versi aktif; snapshot penilaian sebelumnya tetap utuh.
+- PDF tetap maksimal 10 MiB. Tips durasi mengikuti environment aktual. Tidak ada batas 15 menit, DOC,
+  ETA atau angka contoh desain yang diklaim sebagai fitur aktif.
+
+Migration `0004` menambahkan preferensi notifikasi hasil. Jalankan `bun run db:migrate` saat mengambil perubahan
+ini di mesin lain, lalu restart web/worker. Pada workspace lokal migration sudah diterapkan tanpa reset data.
+
+Skenario tambahan: buat dua draf dari modul aktif, edit/hapus draf yang lebih lama, publikasikan draf lain,
+aktifkan kembali versi terdahulu, lalu pastikan detail siswa hanya menunjukkan versi aktif dan hasil lama tetap sama.

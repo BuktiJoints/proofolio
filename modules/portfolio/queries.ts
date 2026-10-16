@@ -11,6 +11,7 @@ export type PortfolioItem = {
   submission: Submission;
   rubric: RubricVersion;
   shares: Share[];
+  verifiedCriterionCount?: number;
 };
 
 // All consumers of this cache key must store the same response shape.

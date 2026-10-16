@@ -1,4 +1,5 @@
 "use client";
+import { MoreHorizontal } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -16,15 +17,17 @@ import { Badge } from "@/components/ui/badge";
 import { api, jsonBody } from "@/lib/api-client";
 import { useMe } from "@/modules/auth/session";
 import { ProfileIdentity } from "@/modules/shared/profile-identity";
-import { PrintButton } from "@/modules/shared/print-button";
 import { PortfolioSharing } from "./portfolio-sharing";
 import { portfolioQueryOptions, type PortfolioItem } from "./queries";
 import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "@/components/ui/accordion";
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { DesignIcon } from "@/modules/shared/design-icon";
 import { dateLabel } from "@/modules/shared/presentation";
 import {
   LoadingState,
@@ -79,7 +82,7 @@ function PortfolioCard({ item }: { item: PortfolioItem }) {
     }
   }
   return (
-    <Card>
+    <Card className="rounded-xl">
       <CardHeader>
         <CardTitle>{item.rubric.title}</CardTitle>
         <CardDescription>
@@ -180,61 +183,93 @@ export function PortfolioPage() {
   if (query.error || me.error)
     return <ErrorState error={query.error ?? me.error} />;
   const items = query.data;
+  const skills = new Set(
+    items.map(
+      (item) =>
+        item.rubric.rubricId ??
+        item.submission.rubricVersionId ??
+        item.rubric.title,
+    ),
+  ).size;
   return (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-5">
-        <ProfileIdentity me={me.data!} />
-        <div className="flex gap-6 text-center">
-          <div>
-            <p className="text-h4 text-primary-70">{items.length}</p>
-            <p className="text-b9 text-neutral-70">Skill terverifikasi</p>
+      <Card className="rounded-2xl ring-primary-20">
+        <CardContent className="flex flex-wrap items-center justify-between gap-6 md:px-10">
+          <ProfileIdentity me={me.data!} />
+          <div className="flex gap-3">
+            {[
+              [skills, "Skill terverifikasi", "bg-primary-10 text-primary-70"],
+              [items.length, "Lencana", "bg-secondary-10 text-secondary-70"],
+            ].map(([value, label, color]) => (
+              <div
+                key={String(label)}
+                className={`min-w-28 space-y-3 rounded-xl p-4 ${color}`}
+              >
+                <p className="text-h3">{value}</p>
+                <p className="text-b9 text-neutral-70">{label}</p>
+              </div>
+            ))}
           </div>
-          <div>
-            <PrintButton label="Unduh Portofolio (PDF)" />
-          </div>
-        </div>
-      </div>
-      <div className="grid items-start gap-8 lg:grid-cols-[2fr_1fr]">
+        </CardContent>
+      </Card>
+      <div className="grid items-start gap-6 lg:grid-cols-[2fr_1fr]">
         <section className="space-y-5">
           <h2 className="text-h5">Daftar Bukti Kompetensi</h2>
           {items.length ? (
             items.map((item) => (
               <Card key={item.submission.id}>
-                <CardContent className="space-y-4">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="space-y-2">
-                      <CardTitle className="text-s7">
-                        {item.rubric.title}
-                      </CardTitle>
-                      <p className="text-b9 text-neutral-70">
-                        {item.rubric.partnerName || "Rubrik sekolah"} ·{" "}
-                        {dateLabel(item.submission.completedAt)}
-                      </p>
-                      <div className="flex gap-3">
-                        <Badge variant="success">Terverifikasi</Badge>
-                        <span className="text-s9 text-primary-70">
-                          Skor {item.submission.normalizedScore}/100
-                        </span>
-                      </div>
+                <CardContent className="flex flex-wrap items-center gap-5">
+                  <span className="flex size-14 shrink-0 -rotate-6 items-center justify-center rounded-xl border-2 border-dashed border-secondary-50 bg-secondary-10">
+                    <DesignIcon name="award" />
+                  </span>
+                  <div className="min-w-40 flex-1 space-y-1">
+                    <CardTitle className="text-s7">
+                      {item.rubric.title}
+                    </CardTitle>
+                    <p className="text-b9 text-neutral-60">
+                      {item.rubric.partnerName || "Rubrik sekolah"} ·{" "}
+                      {dateLabel(item.submission.completedAt)}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <Badge variant="success">• Terverifikasi</Badge>
+                      <span className="text-s9 text-primary-70">
+                        Skor {item.submission.normalizedScore}/100
+                      </span>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <LinkButton
                       href={`/student/submissions/${item.submission.id}`}
-                      variant="neutral"
-                      className="text-s9 md:text-s9"
+                      variant="outline"
+                      className="h-9 border-primary-30 text-s9 shadow-none md:h-9 md:text-s9"
                     >
                       Detail Hasil Uji Kompetensi
                     </LinkButton>
-                  </div>
-                  <Accordion className="print:hidden">
-                    <AccordionItem value="share">
-                      <AccordionTrigger className="bg-primary-10 text-primary-70 hover:bg-primary-20">
-                        Bagikan bukti video
-                      </AccordionTrigger>
-                      <AccordionContent>
+                    <Dialog>
+                      <DialogTrigger
+                        render={
+                          <Button
+                            size="icon-xs"
+                            variant="link"
+                            aria-label="Bagikan bukti video"
+                            className="print:hidden"
+                          />
+                        }
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </DialogTrigger>
+                      <DialogContent className="max-h-[85vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Bagikan bukti video</DialogTitle>
+                          <DialogDescription>
+                            Buat tautan untuk hasil penilaian ini beserta
+                            videonya.
+                          </DialogDescription>
+                        </DialogHeader>
                         <PortfolioCard item={item} />
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </CardContent>
               </Card>
             ))

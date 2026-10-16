@@ -128,9 +128,11 @@ try {
         "tests/e2e/api-contract.spec.ts",
         "tests/e2e/workflow.spec.ts",
         "tests/e2e/wbs-contract.spec.ts",
+        "tests/e2e/rubric-versions.spec.ts",
         "tests/e2e/profile-schema.spec.ts",
         "tests/e2e/design-system.spec.ts",
         "tests/e2e/main-design.spec.ts",
+        "tests/e2e/fe-revisions.spec.ts",
         "tests/e2e/portfolio-navigation.spec.ts",
       ];
   await command(["x", "playwright", "test", ...specs], true);
