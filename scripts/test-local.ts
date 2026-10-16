@@ -133,6 +133,7 @@ try {
         "tests/e2e/design-system.spec.ts",
         "tests/e2e/main-design.spec.ts",
         "tests/e2e/fe-revisions.spec.ts",
+        "tests/e2e/print-and-dialog.spec.ts",
         "tests/e2e/portfolio-navigation.spec.ts",
       ];
   await command(["x", "playwright", "test", ...specs], true);

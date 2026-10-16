@@ -1,4 +1,5 @@
 "use client";
+import { AssessmentPrintDocument } from "@/modules/shared/print-document";
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -245,149 +246,169 @@ export function SubmissionDetailPage({ id, role }: { id: string; role: Role }) {
   }
   return (
     <>
-      <LinkButton
-        href={`${base}/submissions`}
-        variant="neutral"
-        className="h-9 text-s9 md:h-9 md:text-s9"
-      >
-        ← Kembali ke {student ? "Riwayat" : "Penilaian Siswa"}
-      </LinkButton>
-      <section className="flex flex-wrap items-start justify-between gap-5">
-        <div className="space-y-2">
-          <h1 className="text-h5 md:text-h4">
-            {!student && s.student?.name
-              ? s.student.name
-              : s.rubricVersion.title}
-          </h1>
-          <p className="text-b8 text-neutral-70">
-            {!student
-              ? `${s.student?.nisn ? `NISN ${s.student.nisn} · ` : ""}${s.student?.programKeahlian ?? ""} · ${s.rubricVersion.title}`
-              : `Diunggah ${dateLabel(s.createdAt)} · ${s.originalFilename}`}
-          </p>
-          <StatusBadge status={s.status} />
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {student &&
-            completed &&
-            (s.portfolioIncluded ? (
-              <LinkButton href="/student/portfolio">
-                Lihat Digital Portofolio
-              </LinkButton>
-            ) : (
-              <Button
-                disabled={action.isPending}
-                onClick={() => action.mutate("portfolio")}
-              >
-                Tambahkan ke Digital Portofolio
-              </Button>
-            ))}
-          {completed && <PrintButton label="Unduh Bukti Penilaian (PDF)" />}
-        </div>
-      </section>
-      {action.error && <ErrorState error={action.error} />}
-      {completed && (
-        <Alert variant="success">
-          <AlertTitle>Penilaian berhasil diterbitkan</AlertTitle>
-          <AlertDescription>
-            Hasil berikut sudah diverifikasi oleh asesor.
-          </AlertDescription>
-        </Alert>
-      )}
-      {!completed && student ? (
-        <>
-          <Card>
-            <CardContent className="space-y-6">
-              <ProgressTracker status={s.status} />
-              <div className="grid gap-5 sm:grid-cols-3">
-                <div>
-                  <p className="text-b9 text-neutral-60">Tanggal pengajuan</p>
-                  <p className="mt-1 text-s8">{dateLabel(s.createdAt)}</p>
-                </div>
-                <div>
-                  <p className="text-b9 text-neutral-60">Analisis AI</p>
-                  <p className="mt-1 text-s8">
-                    {s.status === "ANALYSIS_FAILED"
-                      ? "Belum berhasil"
-                      : s.status === "QUEUED"
-                        ? "Dalam antrean"
-                        : s.status === "ANALYZING"
-                          ? "Sedang berjalan"
-                          : "Selesai"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-b9 text-neutral-60">Asesor</p>
-                  <p className="mt-1 text-s8">
-                    {s.status === "IN_REVIEW"
-                      ? "Sedang meninjau"
-                      : "Menunggu verifikasi"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Alert>
-            <AlertTitle>Penilaian masih berlangsung</AlertTitle>
+      <div className="screen-only space-y-8">
+        <LinkButton
+          href={`${base}/submissions`}
+          variant="neutral"
+          className="h-9 text-s9 md:h-9 md:text-s9"
+        >
+          ← Kembali ke {student ? "Riwayat" : "Penilaian Siswa"}
+        </LinkButton>
+        <section className="flex flex-wrap items-start justify-between gap-5">
+          <div className="space-y-2">
+            <h1 className="text-h5 md:text-h4">
+              {!student && s.student?.name
+                ? s.student.name
+                : s.rubricVersion.title}
+            </h1>
+            <p className="text-b8 text-neutral-70">
+              {!student
+                ? `${s.student?.nisn ? `NISN ${s.student.nisn} · ` : ""}${s.student?.programKeahlian ?? ""} · ${s.rubricVersion.title}`
+                : `Diunggah ${dateLabel(s.createdAt)} · ${s.originalFilename}`}
+            </p>
+            <StatusBadge status={s.status} />
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {student &&
+              completed &&
+              (s.portfolioIncluded ? (
+                <LinkButton href="/student/portfolio">
+                  Lihat Digital Portofolio
+                </LinkButton>
+              ) : (
+                <Button
+                  disabled={action.isPending}
+                  onClick={() => action.mutate("portfolio")}
+                >
+                  Tambahkan ke Digital Portofolio
+                </Button>
+              ))}
+            {completed && <PrintButton label="Unduh Bukti Penilaian (PDF)" />}
+          </div>
+        </section>
+        {action.error && <ErrorState error={action.error} />}
+        {completed && (
+          <Alert variant="success">
+            <AlertTitle>Penilaian berhasil diterbitkan</AlertTitle>
             <AlertDescription>
-              Skor akhir dan umpan balik akan tampil setelah asesor
-              menyelesaikan verifikasi. Status diperbarui otomatis.
+              Hasil berikut sudah diverifikasi oleh asesor.
             </AlertDescription>
           </Alert>
-          {s.status === "ANALYSIS_FAILED" && (
-            <Button
-              disabled={action.isPending}
-              onClick={() => action.mutate("retry-analysis")}
-            >
-              Ulangi analisis
-            </Button>
-          )}
-        </>
-      ) : !student && s.status === "IN_REVIEW" && mine ? (
-        <ReviewEditor
-          key={s.review!.id}
-          submission={s}
-          media={media}
-          renderEvidence={evidencePanel}
-        />
-      ) : (
-        <div className="grid items-start gap-8 lg:grid-cols-[1.6fr_1fr]">
-          <div className="space-y-6">
-            {media}
-            {evidencePanel()}
-          </div>
-          {completed ? (
-            summary()
-          ) : (
+        )}
+        {!completed && student ? (
+          <>
             <Card>
-              <CardContent className="space-y-4">
-                <h2 className="text-h5">Detail Penilaian</h2>
-                <p className="text-b8 text-neutral-70">
-                  {s.status === "AWAITING_REVIEW"
-                    ? "Analisis AI selesai. Mulai review untuk memverifikasi bukti dan mengisi nilai."
-                    : s.status === "IN_REVIEW"
-                      ? "Pengajuan ini sedang dinilai oleh asesor lain."
-                      : "Video sedang diproses. Penilaian dapat dimulai setelah analisis AI selesai."}
-                </p>
-                {s.status === "AWAITING_REVIEW" && (
-                  <Button
-                    disabled={action.isPending}
-                    onClick={() => action.mutate("review/start")}
-                  >
-                    Mulai review
-                  </Button>
-                )}
-                {s.status === "ANALYSIS_FAILED" && (
-                  <Button
-                    disabled={action.isPending}
-                    onClick={() => action.mutate("retry-analysis")}
-                  >
-                    Ulangi analisis
-                  </Button>
-                )}
+              <CardContent className="space-y-6">
+                <ProgressTracker status={s.status} />
+                <div className="grid gap-5 sm:grid-cols-3">
+                  <div>
+                    <p className="text-b9 text-neutral-60">Tanggal pengajuan</p>
+                    <p className="mt-1 text-s8">{dateLabel(s.createdAt)}</p>
+                  </div>
+                  <div>
+                    <p className="text-b9 text-neutral-60">Analisis AI</p>
+                    <p className="mt-1 text-s8">
+                      {s.status === "ANALYSIS_FAILED"
+                        ? "Belum berhasil"
+                        : s.status === "QUEUED"
+                          ? "Dalam antrean"
+                          : s.status === "ANALYZING"
+                            ? "Sedang berjalan"
+                            : "Selesai"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-b9 text-neutral-60">Asesor</p>
+                    <p className="mt-1 text-s8">
+                      {s.status === "IN_REVIEW"
+                        ? "Sedang meninjau"
+                        : "Menunggu verifikasi"}
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          )}
-        </div>
+            <Alert>
+              <AlertTitle>Penilaian masih berlangsung</AlertTitle>
+              <AlertDescription>
+                Skor akhir dan umpan balik akan tampil setelah asesor
+                menyelesaikan verifikasi. Status diperbarui otomatis.
+              </AlertDescription>
+            </Alert>
+            {s.status === "ANALYSIS_FAILED" && (
+              <Button
+                disabled={action.isPending}
+                onClick={() => action.mutate("retry-analysis")}
+              >
+                Ulangi analisis
+              </Button>
+            )}
+          </>
+        ) : !student && s.status === "IN_REVIEW" && mine ? (
+          <ReviewEditor
+            key={s.review!.id}
+            submission={s}
+            media={media}
+            renderEvidence={evidencePanel}
+          />
+        ) : (
+          <div className="grid items-start gap-8 lg:grid-cols-[1.6fr_1fr]">
+            <div className="space-y-6">
+              {media}
+              {evidencePanel()}
+            </div>
+            {completed ? (
+              summary()
+            ) : (
+              <Card>
+                <CardContent className="space-y-4">
+                  <h2 className="text-h5">Detail Penilaian</h2>
+                  <p className="text-b8 text-neutral-70">
+                    {s.status === "AWAITING_REVIEW"
+                      ? "Analisis AI selesai. Mulai review untuk memverifikasi bukti dan mengisi nilai."
+                      : s.status === "IN_REVIEW"
+                        ? "Pengajuan ini sedang dinilai oleh asesor lain."
+                        : "Video sedang diproses. Penilaian dapat dimulai setelah analisis AI selesai."}
+                  </p>
+                  {s.status === "AWAITING_REVIEW" && (
+                    <Button
+                      disabled={action.isPending}
+                      onClick={() => action.mutate("review/start")}
+                    >
+                      Mulai review
+                    </Button>
+                  )}
+                  {s.status === "ANALYSIS_FAILED" && (
+                    <Button
+                      disabled={action.isPending}
+                      onClick={() => action.mutate("retry-analysis")}
+                    >
+                      Ulangi analisis
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+      </div>
+      {completed && (
+        <AssessmentPrintDocument
+          submission={s}
+          student={
+            student
+              ? {
+                  name: me.data?.user.name ?? "Siswa",
+                  schoolName: me.data?.profile?.schoolName,
+                  programKeahlian: me.data?.profile?.programKeahlian,
+                }
+              : {
+                  name: s.student?.name ?? "Siswa",
+                  schoolName: s.student?.schoolName,
+                  programKeahlian: s.student?.programKeahlian,
+                }
+          }
+        />
       )}
     </>
   );

@@ -189,3 +189,18 @@ perintah persetujuan admin, portofolio publik dan batas fitur saat ini.
 
 Revisi editor dan pengelolaan versi: `/assessor/rubrics/:id/edit?versionId=UUID` serta
 `/assessor/rubrics/:id/versions/new`. Daftar versi tetap berada di `/assessor/rubrics/:id`.
+
+Perbaikan ekspor dan ekstraksi (16 Oktober 2026):
+- Portofolio siswa, portofolio publik dan hasil penilaian final memakai layout cetak A4 khusus.
+  Pada dialog cetak pilih Save as PDF; matikan Headers and footers bila tidak ingin URL/tanggal bawaan browser.
+- Modal berbagi dan password memiliki lebar responsif dan batas tinggi viewport.
+- Model PDF memakai `GEMINI_RUBRIC_MODEL=gemini-2.5-flash`, terpisah dari `GEMINI_MODEL` video.
+  Restart web setelah mengubah environment. Tidak perlu migration untuk perubahan ini.
+- Ekstraksi tetap satu permintaan, maksimal 60 detik, tanpa penyimpanan otomatis. BUSY berarti
+  provider sibuk/kuota terbatas; UNAVAILABLE berarti model/akses perlu diperiksa pengelola.
+- Indikator kriteria mendukung 8000 karakter di editor/API; tidak dipotong diam-diam.
+
+Uji manual: cetak portofolio (termasuk saat toast aktif); cetak hasil dengan bukti panjang dan
+feedback; cetak portofolio publik; buka modal berbagi dengan banyak riwayat pada ponsel/desktop;
+buka modal password; unggah PDF rubrik nyata, periksa bobot dan seluruh indikator sebelum
+menggunakan hasil ekstraksi dan menyimpannya sebagai draf.
